@@ -11,18 +11,18 @@ import frc.robot.Commands.Arm.*;
 // Use this class to contain all choreographed movements
 public class CommandFactory {
 
-    // Don't instantiate, just access the functions in a static way
-    private CommandFactory() {}
+	// Don't instantiate, just access the functions in a static way
+	private CommandFactory() {}
 
-    public static Command raiseArm() {
-        return new SequentialCommandGroup(
-            new MoveArmToAngle(45, 2)
-        );
-    }
+	public static Command raiseArm() {
+		return new SequentialCommandGroup(
+			new MoveArmToAngle(45, 2)
+		);
+	}
 
-    public static Command lowerArm() {
-        return new SequentialCommandGroup(
-            new MoveArmToAngle(10, 2)
-        );
-    }
+	public static Command lowerArm() {
+		return new SequentialCommandGroup(
+			new MoveArmToAngle(10, 2)
+		);
+	}
 }

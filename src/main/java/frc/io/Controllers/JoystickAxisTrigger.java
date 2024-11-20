@@ -11,9 +11,9 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 public class JoystickAxisTrigger extends Trigger {
 
-    public JoystickAxisTrigger(GenericHID genericHID, int axis, double threshold) {
-        super(() -> Math.abs(genericHID.getRawAxis(axis)) > threshold);
-        ErrorMessages.requireNonNullParam(genericHID, genericHID.getName(), "JoystickAxisTrigger constructor");
-    }
+  public JoystickAxisTrigger(GenericHID genericHID, int axis, double threshold) {
+    super(() -> Math.abs(genericHID.getRawAxis(axis)) > threshold);
+    ErrorMessages.requireNonNullParam(genericHID, genericHID.getName(), "JoystickAxisTrigger constructor");
+  }
 
 }

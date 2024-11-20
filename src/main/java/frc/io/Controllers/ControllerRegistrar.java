@@ -8,21 +8,24 @@ import java.util.HashSet;
 
 public class ControllerRegistrar {
 
-    HashSet<Integer> m_portsUsed = new HashSet<Integer>();
+  HashSet<Integer> m_portsUsed = new HashSet<Integer>();
 
-    private static ControllerRegistrar m_instance;
-    public static ControllerRegistrar getInstance() {
-        if (m_instance == null) {
-            m_instance = new ControllerRegistrar();
-        }
-        return m_instance; 
-    }
-    private ControllerRegistrar() {}
+  private static ControllerRegistrar m_instance;
 
-    public void registerController(int port) {
-        if (m_portsUsed.contains(port))
-            throw new RuntimeException("Multiple controllers mapped to port " + Integer.toString(port));
-        m_portsUsed.add(port);
+  public static ControllerRegistrar getInstance() {
+    if (m_instance == null) {
+      m_instance = new ControllerRegistrar();
     }
+    return m_instance;
+  }
+
+  private ControllerRegistrar() {
+  }
+
+  public void registerController(int port) {
+    if (m_portsUsed.contains(port))
+      throw new RuntimeException("Multiple controllers mapped to port " + Integer.toString(port));
+    m_portsUsed.add(port);
+  }
 
 }
