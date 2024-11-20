@@ -6,7 +6,10 @@ package frc.robot.Commands;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 import frc.robot.Commands.Arm.*;
+import frc.robot.Commands.Intake.*;
+import frc.robot.Commands.Shooter.*;
 
 // Use this class to contain all choreographed movements
 public class CommandFactory {
@@ -15,14 +18,27 @@ public class CommandFactory {
 	private CommandFactory() {}
 
 	public static Command raiseArm() {
-		return new SequentialCommandGroup(
-			new MoveArmToAngle(45, 2)
-		);
+		return new MoveArmToAngle(45, 2);
 	}
 
 	public static Command lowerArm() {
-		return new SequentialCommandGroup(
-			new MoveArmToAngle(10, 2)
-		);
+		return new MoveArmToAngle(30, 2);
 	}
+
+  public static Command stopShooter() {
+    return new RevToRPM(0, 10e3, false);
+  }
+
+  public static Command stopIntake() {
+    return new RunIntake(0, false);
+  }
+
+  public static Command fire() {
+    return new SequentialCommandGroup(
+      new RevToRPM(4000, 100, true),
+      new WaitCommand(1.0)
+        .deadlineWith(new RunIntake(0.75, false)),
+      stopShooter()
+    );
+  }
 }

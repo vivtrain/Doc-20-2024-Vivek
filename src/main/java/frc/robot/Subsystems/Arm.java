@@ -167,7 +167,7 @@ public class Arm extends SubsystemBase {
 			.withSlot(whichSlot)
 			.withPosition(degrees / 360)
 			.withLimitForwardMotion(getArmAngleDegrees() > 80) // just in case
-			.withLimitReverseMotion(getArmAngleDegrees() < 10) // just in case
+			.withLimitReverseMotion(getArmAngleDegrees() < 5) // just in case
 		);
 	}
 
@@ -178,7 +178,7 @@ public class Arm extends SubsystemBase {
 			.withSlot(kAscentGains)
 			.withPosition(m_setpointDegrees / 360)
 			.withLimitForwardMotion(getArmAngleDegrees() > 80) // just in case
-			.withLimitReverseMotion(getArmAngleDegrees() < 10) // just in case
+			.withLimitReverseMotion(getArmAngleDegrees() < 5)  // just in case
 		);
 	}
 
@@ -187,7 +187,7 @@ public class Arm extends SubsystemBase {
 		m_armTalon.setControl(m_dutyCycleRequest
 			.withOutput(dutyCycle)
 			.withLimitForwardMotion(getArmAngleDegrees() > 80) // just in case
-			.withLimitReverseMotion(getArmAngleDegrees() < 5) // just in case
+			.withLimitReverseMotion(getArmAngleDegrees() < 5)  // just in case
 		);
 	}
 

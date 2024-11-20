@@ -42,9 +42,8 @@ public class Shooter extends SubsystemBase {
 
   private static Shooter m_instance;
   public static Shooter getInstance() {
-    if (m_instance == null) {
+    if (m_instance == null)
       m_instance = new Shooter();
-    }
     return m_instance;
   } 
 

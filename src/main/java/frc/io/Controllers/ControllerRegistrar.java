@@ -13,9 +13,8 @@ public class ControllerRegistrar {
   private static ControllerRegistrar m_instance;
 
   public static ControllerRegistrar getInstance() {
-    if (m_instance == null) {
+    if (m_instance == null)
       m_instance = new ControllerRegistrar();
-    }
     return m_instance;
   }
 
