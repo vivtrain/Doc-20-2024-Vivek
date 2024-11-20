@@ -20,7 +20,8 @@ public class ControllerRegistrar {
     private ControllerRegistrar() {}
 
     public void registerController(int port) {
-        assert !m_portsUsed.contains(port);
+        if (m_portsUsed.contains(port))
+            throw new RuntimeException("Multiple controllers mapped to port " + Integer.toString(port));
         m_portsUsed.add(port);
     }
 

@@ -34,7 +34,8 @@ public class MoveArmDutyCycle extends Command {
   // Called once the command ends or is interrupted.
   @Override
   public void end(boolean interrupted) {
-    m_arm.moveTo(m_arm.getArmAngleDegrees());
+    //m_arm.moveTo(m_arm.getArmAngleDegrees());
+    m_arm.moveManually(0);
   }
 
   // Returns true when the command should end.

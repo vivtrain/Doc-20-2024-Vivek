@@ -10,24 +10,26 @@ import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
 public class RegisteredController extends GenericHID {
-    ControllerRegistrar m_controllerBase = ControllerRegistrar.getInstance();
+    private ControllerRegistrar m_registrar = ControllerRegistrar.getInstance();
 
-    HashSet<Integer> m_buttonMappings = new HashSet<Integer>();
-    HashSet<Integer> m_axisMappings = new HashSet<Integer>();
+    private HashSet<Integer> m_buttonMappings = new HashSet<Integer>();
+    private HashSet<Integer> m_axisMappings = new HashSet<Integer>();
 
     public RegisteredController(int port) {
         super(port);
-        m_controllerBase.registerController(port);
+        m_registrar.registerController(port);
     }
 
     public JoystickButton registerButtonMap(int buttonID) {
-        assert !m_buttonMappings.contains(buttonID);
+        if (m_buttonMappings.contains(buttonID))
+            throw new RuntimeException("Multiple mappings on button " + Integer.toString(buttonID) + " of GenericHID " +  Integer.toString(super.getPort()));
         m_buttonMappings.add(buttonID);
         return new JoystickButton(this, buttonID);
     }
 
     public JoystickAxisTrigger registerTriggerMap(int axisID, double threshold) {
-        assert !m_axisMappings.contains(axisID);
+        if (m_axisMappings.contains(axisID))
+            throw new RuntimeException("Multiple mappings on axis " + Integer.toString(axisID) + " of GenericHID " +  Integer.toString(super.getPort()));
         m_axisMappings.add(axisID);
         return new JoystickAxisTrigger(this, axisID, threshold);
     }

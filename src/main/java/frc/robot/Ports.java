@@ -12,8 +12,8 @@ public class Ports {
             public static final int SWERVE_REAR_LEFT_DRIVE     = 14;
             public static final int SWERVE_REAR_RIGHT_AZIMUTH = 5;
             public static final int SWERVE_REAR_RIGHT_DRIVE    = 4;
-            public static final int ARM_LEADER  = 3;
-            public static final int ARM_FOLLOWER  = 18;
+            public static final int ARM_LEADER  = 18;
+            public static final int ARM_FOLLOWER  = 3;
             public static final int INTAKE = 7;
             public static final int SHOOTER = 6;
             public static final int CLIMBER_LEADER = 2;

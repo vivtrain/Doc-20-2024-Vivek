@@ -13,7 +13,7 @@ public class JoystickAxisTrigger extends Trigger {
 
     public JoystickAxisTrigger(GenericHID genericHID, int axis, double threshold) {
         super(() -> Math.abs(genericHID.getRawAxis(axis)) > threshold);
-        ErrorMessages.requireNonNullParam(genericHID, genericHID.getName(), this.getClass().getEnclosingConstructor().getName());
+        ErrorMessages.requireNonNullParam(genericHID, genericHID.getName(), "JoystickAxisTrigger constructor");
     }
 
 }

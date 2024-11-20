@@ -19,13 +19,13 @@ import com.ctre.phoenix6.signals.*;
 public class Arm extends SubsystemBase {
 
     // Constants
-    private static final double kEncoderOffsetRotations = 0.0; // rotations of magnet, TODO: determine empirically
+    private static final double kEncoderOffsetRotations = -0.196; // rotations of magnet, TODO: determine empirically
     private static final double kGearReduction = 240 / 1; // TODO: what are the ratios in planetary vs. spur vs. sprocket?
     private static final double kMaxStatorAmps = 5.0; // TODO: raise once safety established
     private static final double kMaxSupplyAmps = 0.0; // TODO: raise once safety established
     private static final double kSecondsToRampVoltage = 0.1;
-    private static final double kForwardLimitMotorRotations = 0.0; // TODO: determine empirically
-    private static final double kReverseLimitMotorRotations = 0.0; // TODO: determine empirically
+    private static final double kForwardLimitMotorRotations = 1.20; // TODO: determine empirically
+    private static final double kReverseLimitMotorRotations = 1.00; // TODO: determine empirically
     private static final int kAscentGains = 0;
     private static final int kDescentGains = 1;
     private static final double kCruiseVelocityRps = 0.25 / 0.628; // TODO: check for accuracy
@@ -36,10 +36,10 @@ public class Arm extends SubsystemBase {
     private Double m_setpointDegrees = null;
 
     // Talons
-    private TalonFX m_armTalonLeader = new TalonFX(Ports.CANDevices.Talons.ARM_LEADER);
+    private TalonFX m_armTalonLeader = new TalonFX(Ports.CANDevices.Talons.ARM_LEADER, "*");
     private TalonFXConfigurator m_armLeaderConfigurator = m_armTalonLeader.getConfigurator();
     private StatusSignal<Double> m_armTalonPositionSignal = m_armTalonLeader.getPosition();
-    private TalonFX m_armTalonFollower = new TalonFX(Ports.CANDevices.Talons.ARM_FOLLOWER);
+    private TalonFX m_armTalonFollower = new TalonFX(Ports.CANDevices.Talons.ARM_FOLLOWER, "*");
     private TalonFXConfigurator m_armFollowerConfigurator = m_armTalonLeader.getConfigurator();
 
     // Encoder
@@ -84,21 +84,16 @@ public class Arm extends SubsystemBase {
         // Configure global motor output parameters
         MotorOutputConfigs motorOutputConfig = new MotorOutputConfigs()
             .withDutyCycleNeutralDeadband(0.01) // <1% power will be ignored
-            .withInverted(InvertedValue.Clockwise_Positive) // clockwise positive facing the rotor end
+            .withInverted(InvertedValue.Clockwise_Positive) // ccw positive facing the rotor end
             .withNeutralMode(NeutralModeValue.Coast);
         m_armLeaderConfigurator.apply(motorOutputConfig);
-
-        // Make the follower follow the leader, but in the opposite direction
-        Follower followCtrlRequest = new Follower(m_armTalonLeader.getDeviceID(), true);
-        m_armTalonFollower.setControl(followCtrlRequest);
 
         // Apply offset to encoder
         MagnetSensorConfigs magnetConfig = new MagnetSensorConfigs()
             .withMagnetOffset(kEncoderOffsetRotations)
+            .withAbsoluteSensorRange(AbsoluteSensorRangeValue.Signed_PlusMinusHalf) // we want to read negative encoder positions
             .withSensorDirection(SensorDirectionValue.Clockwise_Positive); // when looking at the status LED
         m_encoderConfigurator.apply(magnetConfig);
-        // Set Talon position to correspond to CANCoder position
-        m_armTalonLeader.setPosition(m_encoderPositionSignal.refresh().getValue() / 360 * kGearReduction);
 
         // Apply voltage ramp rates
         ClosedLoopRampsConfigs closedLoopVoltageRampRate = new ClosedLoopRampsConfigs()
@@ -146,11 +141,19 @@ public class Arm extends SubsystemBase {
             .withMotionMagicAcceleration(kMaxAccelerationRps2)
             .withMotionMagicJerk(kMaxJerkRps3);
         m_armLeaderConfigurator.apply(motionMagicConfig);
+
+        // Make the follower follow the leader, but in the opposite direction
+        Follower followCtrlRequest = new Follower(m_armTalonLeader.getDeviceID(), true);
+        m_armTalonFollower.setControl(followCtrlRequest);
+
+        // Set Talon position to correspond to CANCoder position
+        m_armTalonLeader.setPosition(m_encoderPositionSignal.refresh().getValue() % 1);
     }
 
     public double getArmAngleDegrees() {
-        // Encoder will read Arm rotations
-        return m_encoderPositionSignal.getValue() * 360;
+        // Encoder will read Arm rotations so translate to degrees
+        double degrees = m_encoderPositionSignal.getValue() * 360;
+        return degrees;
     }
 
     public void moveTo(double degrees) {
@@ -180,13 +183,9 @@ public class Arm extends SubsystemBase {
         m_setpointDegrees = null;
         m_armTalonLeader.setControl(m_dutyCycleRequest
             .withOutput(dutyCycle)
-            .withLimitForwardMotion(getArmAngleDegrees() > 80)
-            .withLimitReverseMotion(getArmAngleDegrees() < 10)
+            .withLimitForwardMotion(getArmAngleDegrees() > 80) // just in case
+            .withLimitReverseMotion(getArmAngleDegrees() < 5) // just in case
         );
-    }
-
-    public void idle() {
-        m_setpointDegrees = null;
     }
 
     public void kill() {
@@ -199,7 +198,7 @@ public class Arm extends SubsystemBase {
         // Refresh all status signals once per robot loop
         BaseStatusSignal.refreshAll(m_armTalonPositionSignal, m_encoderPositionSignal);
         // Hold your position (if there exists a setpoint)
-        hold();
+        //hold();
         // Place all readouts in below function
         outputTelemetry();
     }
@@ -207,5 +206,6 @@ public class Arm extends SubsystemBase {
     public void outputTelemetry() {
         SmartDashboard.putNumber("Arm/encoder degrees", getArmAngleDegrees());
         SmartDashboard.putNumber("Arm/motor rotations", m_armTalonPositionSignal.getValue());
+        SmartDashboard.putNumber("Arm/duty cycle", m_armTalonLeader.getDutyCycle().refresh().getValue());
     }
 }

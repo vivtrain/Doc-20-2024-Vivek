@@ -5,6 +5,7 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import frc.io.Controllers.RegisteredController;
 import frc.robot.Commands.Arm.*;
@@ -17,21 +18,24 @@ public class ControllerBindings {
 
     // Singleton ensures only one object exists
     private static ControllerBindings m_instance;
-    public ControllerBindings getInstance() {
+    public static ControllerBindings getInstance() {
         if (m_instance == null) {
             m_instance = new ControllerBindings();
         }
         return m_instance;
     }
 
+    // Do not try to construct an object directly
+    private ControllerBindings() {}
+
     // Map all buttons and triggers in the constructor
     // Instantiate in Robot class
-    private ControllerBindings() {
+    public void bindCommandsToControllers() {
         // Base driver mappings
         m_baseDriver.registerButtonMap(XboxController.Button.kA.value)
-            .onTrue(new SequentialCommandGroup()); // empty command group
+            .onTrue(new SequentialCommandGroup()); // empty command group for testing
         // Co-driver mappings
-        m_coDriver.registerTriggerMap(XboxController.Axis.kRightY.value, 0.1)
+        m_coDriver.registerTriggerMap(XboxController.Axis.kRightY.value, 0.25)
             .whileTrue(new MoveArmDutyCycle(m_coDriver, XboxController.Axis.kRightY.value));
         m_coDriver.registerButtonMap(XboxController.Button.kY.value)
             .onTrue(CommandFactory.raiseArm());
