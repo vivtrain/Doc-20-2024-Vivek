@@ -7,9 +7,10 @@ package frc.robot;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import frc.io.Controllers.RegisteredController;
-import frc.robot.Commands.Arm.*;
-import frc.robot.Commands.Intake.RunIntake;
 import frc.robot.Commands.CommandFactory;
+import frc.robot.Commands.Arm.*;
+import frc.robot.Commands.Shooter.*;
+import frc.robot.Commands.Intake.*;
 
 // Use this class to map Commands to controllers
 public class ControllerBindings {
@@ -37,14 +38,18 @@ public class ControllerBindings {
 
     // Co-driver mappings
     m_coDriver.registerTriggerMap(XboxController.Axis.kRightY.value, 0.25)
-      .whileTrue(new MoveArmDutyCycle(m_coDriver, XboxController.Axis.kRightY.value, false));
+      .whileTrue(new MoveArmDutyCycle(m_coDriver, XboxController.Axis.kRightY.value, true));
     m_coDriver.registerButtonMap(XboxController.Button.kY.value)
       .onTrue(CommandFactory.raiseArm());
     m_coDriver.registerButtonMap(XboxController.Button.kA.value)
       .onTrue(CommandFactory.lowerArm());
     m_coDriver.registerButtonMap(XboxController.Button.kRightBumper.value)
-      .whileTrue(new RunIntake(0.5, true));
+      .whileTrue(CommandFactory.intake());
+    m_coDriver.registerButtonMap(XboxController.Button.kLeftBumper.value)
+      .whileTrue(CommandFactory.outtake());
     m_coDriver.registerTriggerMap(XboxController.Axis.kRightTrigger.value, 0.5)
-      .onTrue(CommandFactory.fire());
+      .whileTrue(new RevToRPM(3000, 100, true));
+    m_coDriver.registerButtonMap(XboxController.Button.kB.value)
+      .onTrue(CommandFactory.stopShooter());
   }
 }

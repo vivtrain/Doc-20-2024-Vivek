@@ -18,7 +18,7 @@ import frc.robot.Ports;
 public class Intake extends SubsystemBase {
 
 	// Constants
-	private static final double kMaxStatorAmps = 5.0;
+	private static final double kMaxStatorAmps = 40.0;
 	private static final double kMaxSupplyAmps = 0.0;
 	private static final double kSecondsToRampVoltage = 0.1;
 
@@ -58,7 +58,7 @@ public class Intake extends SubsystemBase {
 		// Configure global motor output parameters
 		MotorOutputConfigs motorOutputConfig = new MotorOutputConfigs()
 			.withDutyCycleNeutralDeadband(0.01) // <1% power will be ignored
-			.withInverted(InvertedValue.Clockwise_Positive) // TODO: check
+			.withInverted(InvertedValue.CounterClockwise_Positive) // Define positive duty cycle => intake
 			.withNeutralMode(NeutralModeValue.Coast);
 		m_talonConfigurator.apply(motorOutputConfig);
 

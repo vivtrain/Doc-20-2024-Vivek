@@ -21,7 +21,7 @@ public class Arm extends SubsystemBase {
 	// Constants
 	private static final double kEncoderOffsetRotations = -0.196; // rotations of magnet, TODO: determine empirically
 	private static final double kGearReduction = 240 / 1;
-	private static final double kMaxStatorAmps = 5.0; // TODO: raise once safety established
+	private static final double kMaxStatorAmps = 40.0; // TODO: raise once safety established
 	private static final double kMaxSupplyAmps = 0.0; // TODO: raise once safety established
 	private static final double kSecondsToRampVoltage = 0.1;
 	private static final double kForwardLimitMotorRotations = 1.20; // TODO: determine empirically
@@ -36,7 +36,7 @@ public class Arm extends SubsystemBase {
 	private TalonFX m_armTalon = new TalonFX(Ports.CANDevices.Talons.ARM_LEADER, "*");
 	private TalonFX m_armTalonFollower = new TalonFX(Ports.CANDevices.Talons.ARM_FOLLOWER, "*");
 
-	// Encoder
+	// Encoders
 	private CANcoder m_encoder = new CANcoder(Ports.CANDevices.Encoders.ARM, "*");
 
 	// Configurators
@@ -49,7 +49,7 @@ public class Arm extends SubsystemBase {
 	private StatusSignal<Double> m_armTalonPositionSignal = m_armTalon.getPosition();
 
 	// Control Requests
-	private MotionMagicExpoVoltage m_positionControlReqeust = new MotionMagicExpoVoltage(0.0)
+	private MotionMagicVoltage m_positionControlReqeust = new MotionMagicVoltage(0.0)
 		.withEnableFOC(true)
 		.withOverrideBrakeDurNeutral(true);
 	private DutyCycleOut m_dutyCycleRequest = new DutyCycleOut(0.0)
@@ -79,9 +79,9 @@ public class Arm extends SubsystemBase {
 		// Setup actuation limits
 		SoftwareLimitSwitchConfigs actuationLimits = new SoftwareLimitSwitchConfigs()
 			.withForwardSoftLimitThreshold(kForwardLimitMotorRotations)
-			.withForwardSoftLimitEnable(true)
+			.withForwardSoftLimitEnable(false)
 			.withReverseSoftLimitThreshold(kReverseLimitMotorRotations)
-			.withReverseSoftLimitEnable(true);
+			.withReverseSoftLimitEnable(false);
 		m_armConfiguratorLeader.apply(actuationLimits);
 
 		// Configure global motor output parameters
@@ -91,7 +91,7 @@ public class Arm extends SubsystemBase {
 			.withNeutralMode(NeutralModeValue.Coast);
 		m_armConfiguratorLeader.apply(motorOutputConfig);
 
-		// Apply offset to encoder
+		// Apply offset to and determine direction of encoder
 		MagnetSensorConfigs magnetConfig = new MagnetSensorConfigs()
 			.withMagnetOffset(kEncoderOffsetRotations)
 			.withAbsoluteSensorRange(AbsoluteSensorRangeValue.Signed_PlusMinusHalf) // we want to read negative encoder positions
@@ -106,8 +106,7 @@ public class Arm extends SubsystemBase {
 			.withVoltageOpenLoopRampPeriod(kSecondsToRampVoltage);
 		m_armConfiguratorLeader.apply(openLoopVoltageRampRate);
 
-		// Use the CANCoder position (rotations) as the feedback source for closed-loop
-		// control
+		// Use the CANCoder position (rotations) as the feedback source for closed-loop control
 		FeedbackConfigs feedbackConfig = new FeedbackConfigs()
 			.withFeedbackSensorSource(FeedbackSensorSourceValue.RemoteCANcoder)
 			.withFeedbackRemoteSensorID(m_encoder.getDeviceID())
@@ -122,8 +121,9 @@ public class Arm extends SubsystemBase {
 			.withKG(0.07) // These were pulled directly from Reca.lc
 			.withKS(0.0)
 			.withKV(29.79)
-			.withKA(0.02)
-			.withKP(0.0)
+			//.withKV(0.0)
+			//.withKA(0.02)
+			.withKP(10.0)
 			.withKI(0.0)
 			.withKD(0.0);
 		Slot1Configs descentConfig = new Slot1Configs() // TODO: figure out proper values
@@ -131,8 +131,8 @@ public class Arm extends SubsystemBase {
 			.withKG(0.07) // These were pulled directly from Reca.lc
 			.withKS(0.0)
 			.withKV(29.79)
-			.withKA(0.02)
-			.withKP(0.0)
+			//.withKA(0.02)
+			.withKP(10.0)
 			.withKI(0.0)
 			.withKD(0.0);
 		m_armConfiguratorLeader.apply(ascentConfig);
@@ -191,6 +191,10 @@ public class Arm extends SubsystemBase {
 		);
 	}
 
+	public void stop() {
+		m_armTalon.stopMotor();
+	}
+
 	@Override
 	public void periodic() {
 		// Refresh all status signals once per robot loop
@@ -199,11 +203,17 @@ public class Arm extends SubsystemBase {
 		//hold();
 		// Place all readouts in below function
 		outputTelemetry();
+
+		if (getArmAngleDegrees() > 80 || getArmAngleDegrees() < 10) {
+			stop();
+		}
 	}
 
 	private void outputTelemetry() {
 		SmartDashboard.putNumber("Arm/encoder degrees", getArmAngleDegrees());
-		SmartDashboard.putNumber("Arm/motor rotations", m_armTalonPositionSignal.getValue());
+		SmartDashboard.putNumber("Arm/talon arm rotations", m_armTalonPositionSignal.getValue());
 		SmartDashboard.putNumber("Arm/duty cycle", m_armTalon.getDutyCycle().refresh().getValue());
+    SmartDashboard.putNumber("Arm/PID error", m_armTalon.getClosedLoopError().refresh().getValue());
+    SmartDashboard.putNumber("Arm/PID output", m_armTalon.getClosedLoopOutput().refresh().getValue());
 	}
 }

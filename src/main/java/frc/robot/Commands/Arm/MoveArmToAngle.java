@@ -13,20 +13,20 @@ public class MoveArmToAngle extends Command {
   private double m_setpoint, m_tolerance;
 
   public MoveArmToAngle(double degrees, double tolerance) {
-    addRequirements();
+    addRequirements(m_arm);
     m_setpoint = degrees;
     m_tolerance = tolerance;
   }
 
   // Called when the command is initially scheduled.
   @Override
-  public void initialize() {}
+  public void initialize() {
+    m_arm.moveTo(m_setpoint);
+  }
 
   // Called every time the scheduler runs while the command is scheduled.
   @Override
-  public void execute() {
-    m_arm.moveTo(m_setpoint);
-  }
+  public void execute() {}
 
   // Called once the command ends or is interrupted.
   @Override
@@ -35,6 +35,7 @@ public class MoveArmToAngle extends Command {
   // Returns true when the command should end.
   @Override
   public boolean isFinished() {
-    return Math.abs(m_setpoint - m_arm.getArmAngleDegrees()) < m_tolerance;
+    //return Math.abs(m_setpoint - m_arm.getArmAngleDegrees()) < m_tolerance;
+    return false;
   }
 }

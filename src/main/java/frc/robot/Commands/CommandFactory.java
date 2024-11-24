@@ -29,6 +29,14 @@ public class CommandFactory {
     return new RevToRPM(0, 10e3, false);
   }
 
+  public static Command intake() {
+    return new RunIntake(0.5, true);
+  }
+
+  public static Command outtake() {
+    return new RunIntake(-0.25, false);
+  }
+
   public static Command stopIntake() {
     return new RunIntake(0, false);
   }
