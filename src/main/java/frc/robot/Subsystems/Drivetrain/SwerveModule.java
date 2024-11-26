@@ -13,6 +13,7 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -49,6 +50,7 @@ public class SwerveModule extends SubsystemBase {
 
   // Status Signals
   private StatusSignal<Double> m_driveVelocityRpsSignal;
+  private StatusSignal<Double> m_drivePositionMetersSignal;
   private StatusSignal<Double> m_azimuthPositionRotationsSignal;
 
   // Control Requests
@@ -84,6 +86,7 @@ public class SwerveModule extends SubsystemBase {
     m_encoderConfigurator = m_encoder.getConfigurator();
 
     m_driveVelocityRpsSignal = m_driveTalon.getVelocity();
+    m_drivePositionMetersSignal = m_driveTalon.getPosition();
     m_azimuthPositionRotationsSignal = m_encoder.getPosition();
 
 		// Limit the stator current for each motor
@@ -177,6 +180,14 @@ public class SwerveModule extends SubsystemBase {
     return Rotation2d.fromRotations(m_azimuthPositionRotationsSignal.getValue());
   }
 
+  private double getDrivePositionMeters() {
+    return m_drivePositionMetersSignal.getValue() * kWheelCircumferenceMeters;
+  }
+
+  public SwerveModulePosition getPosition() {
+    return new SwerveModulePosition(getDrivePositionMeters(), getAzimuthPosition());
+  }
+
   private void requestDriveVelocity(double metersPerSecond) {
     double rps = metersPerSecond / kWheelCircumferenceMeters;
     m_driveTalon.setControl(m_driveVelocityRpsRequest.withVelocity(rps));
@@ -184,8 +195,7 @@ public class SwerveModule extends SubsystemBase {
 
   private void requestAzimuthPosition(Rotation2d position) {
     m_azimuthTalon.setControl(
-      m_azmiuthPositionRotationsRequest
-        .withPosition(position.getRotations())
+      m_azmiuthPositionRotationsRequest.withPosition(position.getRotations())
     );
   }
 
@@ -195,9 +205,12 @@ public class SwerveModule extends SubsystemBase {
       getAzimuthPosition());
   }
 
-  public void requestModuleState(SwerveModuleState state) {
+  public void requestState(SwerveModuleState state) {
     // Optimize the requested state (i.e. take the shortest path to the correct azimuth)
-    SwerveModuleState.optimize(state, getAzimuthPosition());
+    state = SwerveModuleState.optimize(state, getAzimuthPosition());
+    // Perform cosine optimization (i.e. scale the speed based on azimuthal error)
+    /* See WPILib Docs for more info https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/swerve-drive-kinematics.html */
+    state.speedMetersPerSecond *= state.angle.minus(getAzimuthPosition()).getCos();
     requestDriveVelocity(state.speedMetersPerSecond);
     requestAzimuthPosition(state.angle);
   }
@@ -209,14 +222,22 @@ public class SwerveModule extends SubsystemBase {
 
   @Override
   public void periodic() {
-    BaseStatusSignal.refreshAll(m_driveVelocityRpsSignal, m_azimuthPositionRotationsSignal);
+    BaseStatusSignal.refreshAll(
+      m_driveVelocityRpsSignal,
+      m_drivePositionMetersSignal,
+      m_azimuthPositionRotationsSignal);
     outputTelemetry();
   }
 
   private void outputTelemetry() {
     SmartDashboard.putNumber(
-      "Swerve/" + m_whichModule.toString() + " Azimuth Degrees", getAzimuthPosition().getDegrees());
+      "Swerve/" + m_whichModule.toString() + "/Drive Mps",
+      getDriveVelocityMps());
     SmartDashboard.putNumber(
-      "Swerve/" + m_whichModule.toString() + " Drive Mps", getDriveVelocityMps());
+      "Swerve/" + m_whichModule.toString() + "/Drive Meters",
+      getDrivePositionMeters());
+    SmartDashboard.putNumber(
+      "Swerve/" + m_whichModule.toString() + "/Azimuth Degrees",
+      getAzimuthPosition().getDegrees());
   }
 }

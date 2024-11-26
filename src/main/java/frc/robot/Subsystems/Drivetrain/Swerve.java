@@ -12,9 +12,13 @@ import com.ctre.phoenix6.hardware.Pigeon2;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -30,7 +34,11 @@ public class Swerve extends SubsystemBase {
     new SwerveModuleState(0, Rotation2d.fromDegrees(45)),
     new SwerveModuleState(0, Rotation2d.fromDegrees(-45)),
   };
-  private static final double kPhysicalMaxSpeedMps = Units.feetToMeters(19); // TODO: check
+  public static final double kTrackWidthMeters = Units.inchesToMeters(23.25); // distance from left wheel to right wheel
+  public static final double kWheelBaseMeters = Units.inchesToMeters(23.25); // distance from front wheel to back wheel
+  public static final double kRadius = Math.hypot(kWheelBaseMeters/2, kTrackWidthMeters/2); // distance from center to a wheel
+  public static final double kMaxTranslationSpeedMps = Units.feetToMeters(19); // TODO: check
+  public static final double kMaxRotationalSpeedRadPerSecond = kMaxTranslationSpeedMps / kRadius; // omega = v/r
 
   // Consturct all the modules
   SwerveModule m_frontLeftModule = new SwerveModule(
@@ -75,6 +83,7 @@ public class Swerve extends SubsystemBase {
   );
 
   // Collect into an array
+  /* EVERYTHING STAYS IN THIS ORDER */
   private SwerveModule[] m_modules = {
     m_frontLeftModule,
     m_frontRightModule,
@@ -82,10 +91,21 @@ public class Swerve extends SubsystemBase {
     m_rearRightModule
   };
 
-  // Kinetmatics
-  SwerveDriveKinematics m_kinematics = new SwerveDriveKinematics();
-  SwerveModuleState[] m_moduleStates = new SwerveModuleState[m_modules.length];
-  ChassisSpeeds m_chassisState = new ChassisSpeeds();
+  // Kinetmatics (defined in robot coordinates)
+  SwerveDriveKinematics m_kinematics = new SwerveDriveKinematics(
+    new Translation2d(kTrackWidthMeters/2, kWheelBaseMeters/2),  // front left  => +x, +y
+    new Translation2d(kTrackWidthMeters/2, -kWheelBaseMeters/2), // front right => +x, -y
+    new Translation2d(-kTrackWidthMeters/2, kWheelBaseMeters/2), // rear left   => -x, +y
+    new Translation2d(-kTrackWidthMeters/2, -kWheelBaseMeters/2) // rear right  => -x, -y
+  );
+
+  // Pose Estimator
+  SwerveDrivePoseEstimator m_poseEstimator = new SwerveDrivePoseEstimator(
+    m_kinematics,
+    Rotation2d.fromDegrees(0.0),
+    getModulePositions(),
+    new Pose2d()
+  );
 
   // Pigeon
   private Pigeon2 m_gyro = new Pigeon2(Ports.CANDevices.PIGEON, "*");
@@ -94,12 +114,10 @@ public class Swerve extends SubsystemBase {
   private Pigeon2Configurator m_gyroConfigurator = m_gyro.getConfigurator();
 
   // Status Signals
-  /*
-   * Note: Pigeon2.getAngle() and Pigeon2.getRate() follow NED axis conventions
+  /* Note: Pigeon2.getAngle() and Pigeon2.getRate() follow NED axis conventions
    *    which require CW+ orientations. Since we want to keep all of our coordinate systems
    *    for drive consistently CCW+, we will use the raw status signals, which are not
-   *    negated. See the translation at https://api.ctr-electronics.com/phoenix6/release/java/src-html/com/ctre/phoenix6/hardware/Pigeon2.html#line.234
-   */
+   *    negated. See the translation at https://api.ctr-electronics.com/phoenix6/release/java/src-html/com/ctre/phoenix6/hardware/Pigeon2.html#line.234 */
   private StatusSignal<Double> m_angularPositionDegreesSignal = m_gyro.getYaw();
   private StatusSignal<Double> m_angularVelocityDpsSignal = m_gyro.getAngularVelocityZWorld();
 
@@ -131,29 +149,24 @@ public class Swerve extends SubsystemBase {
 
   // Drive the robot relative to its own coordinate system
   /* Note: The ChassisSpeeds coordinates are defined as:
-   *  +vx => forward
-   *  +vy => left
-   *  +vw => counter-clockwise in radians
-   */
+   *  +vx => forward in meters/sec
+   *  +vy => left in meters/sec
+   *  +vw => counter-clockwise in radians/sec */
+   // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
   public void requestChassisSpeeds(ChassisSpeeds chassisSpeeds) {
-    m_chassisState = chassisSpeeds;
     // Determine necessary module states from the requested robot linear and angular velocities
-    m_moduleStates = m_kinematics.toSwerveModuleStates(chassisSpeeds);
+    SwerveModuleState[] moduleStates = m_kinematics.toSwerveModuleStates(chassisSpeeds);
     // Renormalize all module speeds if any is above the attainable max
-    SwerveDriveKinematics.desaturateWheelSpeeds(m_moduleStates, kPhysicalMaxSpeedMps);
-    // This should never happen, so crash if it does
-    if (m_moduleStates.length != m_modules.length)
-      throw new RuntimeException("Tried to assign " + Integer.toString(m_moduleStates.length)
-        + " module states to " + Integer.toString(m_modules.length) + " modules!");
+    SwerveDriveKinematics.desaturateWheelSpeeds(moduleStates, kMaxTranslationSpeedMps);
     // Request the respective module state from each module
     for (int m = 0; m < m_modules.length; m++)
-      m_modules[m].requestModuleState(m_moduleStates[m]);
+      m_modules[m].requestState(moduleStates[m]);
   }
 
   // Lock wheels in an X pattern
   public void lockWheels() {
     for (int m = 0; m < m_modules.length; m++)
-      m_modules[m].requestModuleState(kLockedStates[m]);
+      m_modules[m].requestState(kLockedStates[m]);
   }
 
   public void stop() {
@@ -172,24 +185,50 @@ public class Swerve extends SubsystemBase {
   }
 
   /* Note: The ChassisSpeeds coordinates are defined as:
-   *  +vx => forward
-   *  +vy => left
-   *  +vw => increasing counter-clockwise in radians
-   */
-  public ChassisSpeeds getChassisRelativeSpeeds() {
+   *  +vx => forward in meters/sec
+   *  +vy => left in meters/sec
+   *  +vw => increasing counter-clockwise in radians/sec */
+   // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
+  public ChassisSpeeds getChassisSpeedsRobotRelative() {
+    SwerveModuleState[] moduleStates = new SwerveModuleState[m_modules.length];
     for (int m = 0; m < m_modules.length; m++)
-      m_moduleStates[m] = m_modules[m].getState();
-    ChassisSpeeds state = m_kinematics.toChassisSpeeds(m_moduleStates);
-    state.omegaRadiansPerSecond = getGyroAngularVelocity().getRadians();
+      moduleStates[m] = m_modules[m].getState();
+    ChassisSpeeds state = m_kinematics.toChassisSpeeds(moduleStates);
     return state;
+  }
+
+  public ChassisSpeeds getChassisSpeedsFieldRelative() {
+    return ChassisSpeeds.fromRobotRelativeSpeeds(
+      getChassisSpeedsRobotRelative(),
+      getGyroAngularPosition());
+  }
+
+  private SwerveModulePosition[] getModulePositions() {
+    SwerveModulePosition[] modulePositions = new SwerveModulePosition[m_modules.length];
+    for (int m = 0; m < m_modules.length; m++)
+      modulePositions[m] = m_modules[m].getPosition();
+    return modulePositions;
   }
 
   @Override
   public void periodic() {
     BaseStatusSignal.refreshAll(m_angularPositionDegreesSignal, m_angularVelocityDpsSignal);
     outputTelemetry();
+    m_poseEstimator.update(getGyroAngularPosition(), getModulePositions());
+    // TODO: m_poseEstimator.addVisionMeasurement
   }
 
   private void outputTelemetry() {
+    SmartDashboard.putNumber("Swerve/Gyro/Position (Degrees)",
+      getGyroAngularPosition().getDegrees());
+    SmartDashboard.putNumber("Swerve/Gyro/Velocity (DPS)",
+      getGyroAngularVelocity().getDegrees());
+    ChassisSpeeds chassisSpeeds = getChassisSpeedsRobotRelative();
+    SmartDashboard.putNumber("Swerve/Odometry/X Velocity (MPS)",
+      chassisSpeeds.vxMetersPerSecond);
+    SmartDashboard.putNumber("Swerve/Odometry/Y Velocity (MPS)",
+      chassisSpeeds.vyMetersPerSecond);
+    SmartDashboard.putNumber("Swerve/Odometry/Angular Velocity (Radians Per Second)",
+      chassisSpeeds.omegaRadiansPerSecond);
   }
 }
