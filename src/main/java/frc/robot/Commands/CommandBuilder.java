@@ -12,10 +12,10 @@ import frc.robot.Commands.Intake.*;
 import frc.robot.Commands.Shooter.*;
 
 // Use this class to contain all choreographed movements
-public class CommandFactory {
+public class CommandBuilder {
 
 	// Don't instantiate, just access the functions in a static way
-	private CommandFactory() {}
+	private CommandBuilder() {}
 
 	public static Command raiseArm() {
 		return new MoveArmToAngle(45, 2);
