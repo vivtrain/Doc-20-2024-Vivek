@@ -7,14 +7,24 @@ package frc.robot;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.Subsystems.Arm;
+import frc.robot.Subsystems.Intake;
+import frc.robot.Subsystems.Shooter;
+import frc.robot.Subsystems.Drivetrain.Swerve;
 
 public class Robot extends TimedRobot {
 
   @Override
   public void robotInit() {
-    ControllerBindings.getInstance().bindCommandsToControllers();
     // Initailze subsystems by constructing them here
+    /* Note: even though this is not strictly necessary, it's best to pre-compute and config
+     * as much as possible */
+    // This is a good place to establish any default commands using Subsystem.setDefaultCommand
     Arm.getInstance();
+    Intake.getInstance();
+    Shooter.getInstance();
+    Swerve.getInstance();
+    // Configure teleop button bindings
+    ControllerBindings.getInstance().bindCommandsToControllers();
   }
 
   @Override

@@ -4,6 +4,7 @@
 
 package frc.robot.Commands.Arm;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Subsystems.Arm;
 
@@ -35,7 +36,6 @@ public class MoveArmToAngle extends Command {
   // Returns true when the command should end.
   @Override
   public boolean isFinished() {
-    //return Math.abs(m_setpoint - m_arm.getArmAngleDegrees()) < m_tolerance;
-    return false;
+    return MathUtil.isNear(m_setpoint, m_arm.getArmAngleDegrees(), m_tolerance);
   }
 }

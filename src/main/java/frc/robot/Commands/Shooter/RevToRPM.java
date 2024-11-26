@@ -4,6 +4,7 @@
 
 package frc.robot.Commands.Shooter;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Subsystems.Shooter;
 
@@ -40,6 +41,6 @@ public class RevToRPM extends Command {
   // Returns true when the command should end.
   @Override
   public boolean isFinished() {
-    return Math.abs(m_rpm - m_shooter.getRPM()) < m_tolerance;
+    return MathUtil.isNear(m_rpm, m_shooter.getRPM(), m_tolerance);
   }
 }
