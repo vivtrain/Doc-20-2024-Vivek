@@ -30,7 +30,6 @@ public class SwerveModule extends SubsystemBase {
   private static final double kDriveGearReduction = 5.51 / 1;
   private static final double kAzimuthGearReduction = 13.37 / 1;
   private static final double kWheelCircumferenceMeters = Math.PI*Units.inchesToMeters(3.87);
-  private static final double kCruiseVelocityRps = 0.0; // TODO; set reasonable value
   private static final double kMaxAccelerationRps2 = 0.0; // TODO; set reasonable value
   private static final double kMaxJerkRps3 = 0.0; // TODO; set reasonable value
 
@@ -166,7 +165,6 @@ public class SwerveModule extends SubsystemBase {
 
     // Set up Motion Magic (R)
 		MotionMagicConfigs driveMotionMagicConfig = new MotionMagicConfigs() // TODO: figure out proper values
-			.withMotionMagicCruiseVelocity(kCruiseVelocityRps)
 			.withMotionMagicAcceleration(kMaxAccelerationRps2)
 			.withMotionMagicJerk(kMaxJerkRps3);
     m_driveConfigurator.apply(driveMotionMagicConfig);
