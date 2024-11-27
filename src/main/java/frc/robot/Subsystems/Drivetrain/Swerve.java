@@ -4,6 +4,8 @@
 
 package frc.robot.Subsystems.Drivetrain;
 
+import java.util.Optional;
+
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.MountPoseConfigs;
@@ -21,8 +23,11 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.lib.Limelight.Limelight;
+import frc.lib.Limelight.LimelightHelpers.PoseEstimate;
 import frc.robot.Ports;
 
 public class Swerve extends SubsystemBase {
@@ -107,19 +112,17 @@ public class Swerve extends SubsystemBase {
     new Pose2d()
   );
 
-  // Pigeon
+  // Pigeon + Config + Status Signals
   private Pigeon2 m_gyro = new Pigeon2(Ports.CANDevices.PIGEON, "*");
-
-  // Config
   private Pigeon2Configurator m_gyroConfigurator = m_gyro.getConfigurator();
-
-  // Status Signals
+  private StatusSignal<Double> m_angularPositionDegreesSignal = m_gyro.getYaw();
+  private StatusSignal<Double> m_angularVelocityDpsSignal = m_gyro.getAngularVelocityZWorld();
   /* Note: Pigeon2.getAngle() and Pigeon2.getRate() follow NED axis conventions
    *    which require CW+ orientations. Since we want to keep all of our coordinate systems
    *    for drive consistently CCW+, we will use the raw status signals, which are not
    *    negated. See the translation at https://api.ctr-electronics.com/phoenix6/release/java/src-html/com/ctre/phoenix6/hardware/Pigeon2.html#line.234 */
-  private StatusSignal<Double> m_angularPositionDegreesSignal = m_gyro.getYaw();
-  private StatusSignal<Double> m_angularVelocityDpsSignal = m_gyro.getAngularVelocityZWorld();
+
+  Limelight m_limelight = new Limelight("limelight");
 
   // Singleton code patter ensures only one object exists
   private static Swerve m_instance = null;
@@ -214,8 +217,19 @@ public class Swerve extends SubsystemBase {
   public void periodic() {
     BaseStatusSignal.refreshAll(m_angularPositionDegreesSignal, m_angularVelocityDpsSignal);
     outputTelemetry();
-    m_poseEstimator.update(getGyroAngularPosition(), getModulePositions());
-    // TODO: m_poseEstimator.addVisionMeasurement
+    // Update pose estimator with current time, gyro and odometry information
+    m_poseEstimator.updateWithTime(
+      Timer.getFPGATimestamp(),
+      getGyroAngularPosition(),
+      getModulePositions());
+    // Update pose estimator with vision information and past time (i.e. compensate for latency)
+    Optional<PoseEstimate> limelightBotPose = m_limelight.getBotPoseEstimate();
+    if (limelightBotPose.isPresent()) {
+      m_poseEstimator.addVisionMeasurement(
+        limelightBotPose.get().pose,
+        Timer.getFPGATimestamp() - m_limelight.getTotalLatencySeconds());
+    }
+    // WPILib Pose Estimator Recommendations: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/state-space/state-space-pose-estimators.html
   }
 
   private void outputTelemetry() {
