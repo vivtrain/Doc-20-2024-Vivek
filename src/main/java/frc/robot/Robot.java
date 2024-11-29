@@ -22,9 +22,11 @@ public class Robot extends TimedRobot {
     Arm.getInstance();
     Intake.getInstance();
     Shooter.getInstance();
-    Swerve.getInstance();
+    Swerve.getInstance()/*.setDefaultCommand(new LockSwerveWheels())*/;
     // Configure teleop button bindings
     ControllerBindings.getInstance().bindCommandsToControllers();
+    // Set up Path Planner
+    PathPlannerAutonomous.configure();
   }
 
   @Override
