@@ -5,12 +5,14 @@
 package frc.robot;
 
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.util.HolonomicPathFollowerConfig;
 import com.pathplanner.lib.util.PIDConstants;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import frc.lib.Utility.Utility;
+import frc.robot.Commands.CommandBuilder;
 import frc.robot.Subsystems.Drivetrain.Swerve;
 
 public class PathPlannerAutonomous {
@@ -40,5 +42,10 @@ public class PathPlannerAutonomous {
       holonomicPathFollowerConfig,
       () -> Utility.isOnRed(),
       m_swerve);
+  }
+
+  public static void registerNamedCommands() {
+    NamedCommands.registerCommand("stop", CommandBuilder.lockSwerveWheels());
+    // TODO: whatever else is needed for auto
   }
 }

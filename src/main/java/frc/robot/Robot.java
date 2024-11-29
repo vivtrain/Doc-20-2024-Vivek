@@ -23,10 +23,11 @@ public class Robot extends TimedRobot {
     Intake.getInstance();
     Shooter.getInstance();
     Swerve.getInstance()/*.setDefaultCommand(new LockSwerveWheels())*/;
+    // Set up Path Planner (do this after subsystem inits, but before creating other commands)
+    PathPlannerAutonomous.configure();
+    PathPlannerAutonomous.registerNamedCommands();
     // Configure teleop button bindings
     ControllerBindings.getInstance().bindCommandsToControllers();
-    // Set up Path Planner
-    PathPlannerAutonomous.configure();
   }
 
   @Override
