@@ -76,14 +76,11 @@ public class Limelight {
         + Integer.toString(pipeline));
   }
 
-  /** Get a pose estimate using MegaTag2, Optional since DS Alliance may not be set.
+  /** Get a pose estimate using MegaTag2, Optional since it may not see a tag
    * @return estimated pose or null */
   public Optional<PoseEstimate> getBotPoseEstimate() {
-    if (Utility.isOnBlue())
+    if (seesValidTargets(1))
       return Optional.of(LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(m_name));
-    else if (Utility.isOnRed())
-      return Optional.of(LimelightHelpers.getBotPoseEstimate_wpiRed_MegaTag2(m_name));
-    else
-      return null;
+    return null;
   }
 }

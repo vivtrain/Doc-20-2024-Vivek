@@ -14,6 +14,8 @@ import com.ctre.phoenix6.hardware.Pigeon2;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 
+import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -22,6 +24,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.numbers.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -109,7 +112,9 @@ public class Swerve extends SubsystemBase {
     m_kinematics,
     Rotation2d.fromDegrees(0.0),
     getModulePositions(),
-    new Pose2d()
+    new Pose2d(),
+    VecBuilder.fill(0.05, 0.05, 0.1), // TODO: tune, trust this more maybe?
+    VecBuilder.fill(0.1, 0.1, 0.2)
   );
 
   // Pigeon + Config + Status Signals
@@ -140,20 +145,23 @@ public class Swerve extends SubsystemBase {
       .withMountPoseRoll(0.0)
       .withMountPoseYaw(0.0);
     m_gyroConfigurator.apply(gyroMountPoseConfig);
-
-    // Zero gyro when the object is first constructed
-    resetGyroOrientation();
   }
 
-  // Zero the gyro
-  public void resetGyroOrientation() {
-    m_gyro.reset();
+  // Set the position manually
+  public void resetPosition(Pose2d fieldCoords) {
+    // Reset the gyro, not really necessary but helpful if it matches the pose estimator
+    m_gyro.setYaw(fieldCoords.getRotation().getDegrees());
+    // Overwrite the pose estimator's output position
+    m_poseEstimator.resetPosition(
+      getGyroAngularPosition(),
+      getModulePositions(),
+      fieldCoords);
   }
 
   // Drive the robot relative to its own coordinate system
-  /* Note: The ChassisSpeeds coordinates are defined as:
-   *  +vx => forward in meters/sec
-   *  +vy => left in meters/sec
+  /* Note: The robot-relative ChassisSpeeds coordinates are defined as:
+   *  +vx => forward (from robot's perspective) in meters/sec
+   *  +vy => left (from robot's perspective) in meters/sec
    *  +vw => counter-clockwise in radians/sec */
    // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
   public void requestChassisSpeeds(ChassisSpeeds chassisSpeeds) {
@@ -166,12 +174,13 @@ public class Swerve extends SubsystemBase {
       m_modules[m].requestState(moduleStates[m]);
   }
 
-  // Lock wheels in an X pattern
+  // Lock wheels in an X pattern (make this the default resting state)
   public void lockWheels() {
     for (int m = 0; m < m_modules.length; m++)
       m_modules[m].requestState(kLockedStates[m]);
   }
 
+  // Stop all the drive and azimuth motors (not the default resting state)
   public void stop() {
     for (SwerveModule module : m_modules)
       module.stop();
@@ -187,9 +196,9 @@ public class Swerve extends SubsystemBase {
     return Rotation2d.fromDegrees(m_angularVelocityDpsSignal.getValue());
   }
 
-  /* Note: The ChassisSpeeds coordinates are defined as:
-   *  +vx => forward in meters/sec
-   *  +vy => left in meters/sec
+  /* Note: The robot-relative ChassisSpeeds coordinates are defined as:
+   *  +vx => forward (from robot's perspective) in meters/sec
+   *  +vy => left (from robot's perspective) in meters/sec
    *  +vw => increasing counter-clockwise in radians/sec */
    // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
   public ChassisSpeeds getChassisSpeedsRobotRelative() {
@@ -200,6 +209,11 @@ public class Swerve extends SubsystemBase {
     return state;
   }
 
+  /* Note: The field-relative ChassisSpeeds coordinates are defined as:
+   *  +vx => forward (from blue alliance driver station) in meters/sec
+   *  +vy => left (from blue alliance driver station) in meters/sec
+   *  +vw => increasing counter-clockwise in radians/sec */
+   // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
   public ChassisSpeeds getChassisSpeedsFieldRelative() {
     return ChassisSpeeds.fromRobotRelativeSpeeds(
       getChassisSpeedsRobotRelative(),
@@ -213,36 +227,63 @@ public class Swerve extends SubsystemBase {
     return modulePositions;
   }
 
-  @Override
-  public void periodic() {
-    BaseStatusSignal.refreshAll(m_angularPositionDegreesSignal, m_angularVelocityDpsSignal);
-    outputTelemetry();
-    // Update pose estimator with current time, gyro and odometry information
+  private void updatePosewithOdometry() {
     m_poseEstimator.updateWithTime(
       Timer.getFPGATimestamp(),
       getGyroAngularPosition(),
       getModulePositions());
-    // Update pose estimator with vision information and past time (i.e. compensate for latency)
+  }
+
+  private void updatePoseWithLimelight() {
     Optional<PoseEstimate> limelightBotPose = m_limelight.getBotPoseEstimate();
     if (limelightBotPose.isPresent()) {
+      PoseEstimate estimate = limelightBotPose.get();
+      // Distrust tags more when they are far away
+      double distrust = 1.0 * estimate.avgTagDist; // TODO: tune
+      Matrix<N3,N1> visionStdDevs;
+      // Trust measurements more when they include multiple tags
+      double xyScale = (estimate.tagCount > 1) ? 0.08 : 0.1; // TODO: tune
+      double orientationScale = Double.POSITIVE_INFINITY; // ignore this measurement entirely
+      visionStdDevs = VecBuilder.fill(xyScale, xyScale, orientationScale).times(distrust);
       m_poseEstimator.addVisionMeasurement(
-        limelightBotPose.get().pose,
-        Timer.getFPGATimestamp() - m_limelight.getTotalLatencySeconds());
+        estimate.pose,
+        Timer.getFPGATimestamp() - m_limelight.getTotalLatencySeconds(), // compensate for latency
+        visionStdDevs);
     }
+  }
+
+  public Pose2d getEstimatedPose() {
+    return m_poseEstimator.getEstimatedPosition();
+  }
+
+  @Override
+  public void periodic() {
+    BaseStatusSignal.refreshAll(m_angularPositionDegreesSignal, m_angularVelocityDpsSignal);
     // WPILib Pose Estimator Recommendations: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/state-space/state-space-pose-estimators.html
+    updatePosewithOdometry();
+    updatePoseWithLimelight();
+    outputTelemetry();
   }
 
   private void outputTelemetry() {
-    SmartDashboard.putNumber("Swerve/Gyro/Position (Degrees)",
+    // Gyro
+    SmartDashboard.putNumber("Swerve/Gyro/Position (deg)",
       getGyroAngularPosition().getDegrees());
-    SmartDashboard.putNumber("Swerve/Gyro/Velocity (DPS)",
+    SmartDashboard.putNumber("Swerve/Gyro/Velocity (dps)",
       getGyroAngularVelocity().getDegrees());
     ChassisSpeeds chassisSpeeds = getChassisSpeedsRobotRelative();
-    SmartDashboard.putNumber("Swerve/Odometry/X Velocity (MPS)",
+    // Odometry (robot coords)
+    SmartDashboard.putNumber("Swerve/Odometry/X Velocity (mps)",
       chassisSpeeds.vxMetersPerSecond);
-    SmartDashboard.putNumber("Swerve/Odometry/Y Velocity (MPS)",
+    SmartDashboard.putNumber("Swerve/Odometry/Y Velocity (mps)",
       chassisSpeeds.vyMetersPerSecond);
-    SmartDashboard.putNumber("Swerve/Odometry/Angular Velocity (Radians Per Second)",
+    SmartDashboard.putNumber("Swerve/Odometry/Angular Velocity (rad per s)",
       chassisSpeeds.omegaRadiansPerSecond);
+    // Pose Estimator (field coords)
+    Pose2d estimatedPose = getEstimatedPose();
+    SmartDashboard.putNumber("Swerve/Pose Estimator/X Position (m)", estimatedPose.getX());
+    SmartDashboard.putNumber("Swerve/Pose Estimator/Y Position (m)", estimatedPose.getY());
+    SmartDashboard.putNumber("Swerve/Pose Estimator/Orienation (deg)",
+      estimatedPose.getRotation().getDegrees());
   }
 }
