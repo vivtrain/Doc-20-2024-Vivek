@@ -262,8 +262,22 @@ public class Swerve extends SubsystemBase {
       getGyroAngularPosition());
   }
 
-  /** Get the position of all the modules
-   * @return position of each pair of drive and azimuth motors */
+  /** Get the estimated location and orientation of the robot, including vision, gyro, and
+   *  odometry measurements.
+   * @return estimated position */
+  public Pose2d getEstimatedPose() {
+    return m_poseEstimator.getEstimatedPosition();
+  }
+
+  @Override
+  public void periodic() {
+    BaseStatusSignal.refreshAll(m_angularPositionDegreesSignal, m_angularVelocityDpsSignal);
+    // WPILib Pose Estimator Recommendations: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/state-space/state-space-pose-estimators.html
+    updatePosewithOdometry();
+    updatePoseWithLimelight();
+    outputTelemetry();
+  }
+
   private SwerveModulePosition[] getModulePositions() {
     SwerveModulePosition[] modulePositions = new SwerveModulePosition[m_modules.length];
     for (int m = 0; m < m_modules.length; m++)
@@ -294,22 +308,6 @@ public class Swerve extends SubsystemBase {
         Timer.getFPGATimestamp() - m_limelight.getTotalLatencySeconds(), // compensate for latency
         visionStdDevs);
     }
-  }
-
-  /** Get the estimated location and orientation of the robot, including vision, gyro, and
-   *  odometry measurements.
-   * @return estimated position */
-  public Pose2d getEstimatedPose() {
-    return m_poseEstimator.getEstimatedPosition();
-  }
-
-  @Override
-  public void periodic() {
-    BaseStatusSignal.refreshAll(m_angularPositionDegreesSignal, m_angularVelocityDpsSignal);
-    // WPILib Pose Estimator Recommendations: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/state-space/state-space-pose-estimators.html
-    updatePosewithOdometry();
-    updatePoseWithLimelight();
-    outputTelemetry();
   }
 
   private void outputTelemetry() {
