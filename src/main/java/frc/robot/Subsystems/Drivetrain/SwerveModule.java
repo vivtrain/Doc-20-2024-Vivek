@@ -155,7 +155,7 @@ public class SwerveModule extends SubsystemBase {
 			.withKI(0.0)
 			.withKD(0.0);
     m_driveConfigurator.apply(driveGains);
-    // Azimuth gains are just straight PID
+    // Azimuth gains are just straight PID (this could be upgraded)
     Slot0Configs azimuthGains = new Slot0Configs()
 			.withKS(0.0)
 			.withKP(0.0)
@@ -170,49 +170,37 @@ public class SwerveModule extends SubsystemBase {
     m_driveConfigurator.apply(driveMotionMagicConfig);
   }
 
-  private double getDriveVelocityMps() {
-    return m_driveVelocityRpsSignal.getValue() * kWheelCircumferenceMeters;
-  }
-
-  private Rotation2d getAzimuthPosition() {
-    return Rotation2d.fromRotations(m_azimuthPositionRotationsSignal.getValue());
-  }
-
-  private double getDrivePositionMeters() {
-    return m_drivePositionMetersSignal.getValue() * kWheelCircumferenceMeters;
-  }
-
+  /** Get the position of the module
+   * @return SwerveModulePosition containing drive position in meters and azimuth
+   * position as a Rotation2d */
   public SwerveModulePosition getPosition() {
     return new SwerveModulePosition(getDrivePositionMeters(), getAzimuthPosition());
   }
 
-  private void requestDriveVelocity(double metersPerSecond) {
-    double rps = metersPerSecond / kWheelCircumferenceMeters;
-    m_driveTalon.setControl(m_driveVelocityRpsRequest.withVelocity(rps));
-  }
-
-  private void requestAzimuthPosition(Rotation2d position) {
-    m_azimuthTalon.setControl(
-      m_azmiuthPositionRotationsRequest.withPosition(position.getRotations())
-    );
-  }
-
+  /** Get the state of the module
+   * @return SwerveModuleState containing drive velocity in meters/sec and azimuth
+   * position as a Rotation2d
+   * @apiNote See WPILib Docs for more info https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/swerve-drive-kinematics.html */
   public SwerveModuleState getState() {
     return new SwerveModuleState(
       getDriveVelocityMps(),
       getAzimuthPosition());
   }
 
+  /** Set a goal state for the module
+   * @param state SwerveModuleState containing drive velocity in meters/sec and azimuth
+   * position as a Rotation2d
+   * @apiNote See WPILib Docs for more info https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/swerve-drive-kinematics.html */
   public void requestState(SwerveModuleState state) {
     // Optimize the requested state (i.e. take the shortest path to the correct azimuth)
     state = SwerveModuleState.optimize(state, getAzimuthPosition());
     // Perform cosine optimization (i.e. scale the speed based on azimuthal error)
-    /* See WPILib Docs for more info https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/swerve-drive-kinematics.html */
     state.speedMetersPerSecond *= state.angle.minus(getAzimuthPosition()).getCos();
     requestDriveVelocity(state.speedMetersPerSecond);
     requestAzimuthPosition(state.angle);
   }
 
+  /** Stop both motors in the module */
   public void stop() {
     m_driveTalon.stopMotor();
     m_azimuthTalon.stopMotor();
@@ -225,6 +213,29 @@ public class SwerveModule extends SubsystemBase {
       m_drivePositionMetersSignal,
       m_azimuthPositionRotationsSignal);
     outputTelemetry();
+  }
+
+  private double getDriveVelocityMps() {
+    return m_driveVelocityRpsSignal.getValue() * kWheelCircumferenceMeters;
+  }
+
+  private Rotation2d getAzimuthPosition() {
+    return Rotation2d.fromRotations(m_azimuthPositionRotationsSignal.getValue());
+  }
+
+  private double getDrivePositionMeters() {
+    return m_drivePositionMetersSignal.getValue() * kWheelCircumferenceMeters;
+  }
+
+  private void requestDriveVelocity(double metersPerSecond) {
+    double rps = metersPerSecond / kWheelCircumferenceMeters;
+    m_driveTalon.setControl(m_driveVelocityRpsRequest.withVelocity(rps));
+  }
+
+  private void requestAzimuthPosition(Rotation2d position) {
+    m_azimuthTalon.setControl(
+      m_azmiuthPositionRotationsRequest.withPosition(position.getRotations())
+    );
   }
 
   private void outputTelemetry() {
