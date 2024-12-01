@@ -14,8 +14,10 @@ import com.ctre.phoenix6.hardware.Pigeon2;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -25,6 +27,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.numbers.*;
+import edu.wpi.first.math.trajectory.TrapezoidProfile.Constraints;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -45,8 +48,10 @@ public class Swerve extends SubsystemBase {
   public static final double kTrackWidthMeters = Units.inchesToMeters(23.25); // distance from left wheel to right wheel
   public static final double kWheelBaseMeters = Units.inchesToMeters(23.25); // distance from front wheel to back wheel
   public static final double kRadius = Math.hypot(kWheelBaseMeters/2, kTrackWidthMeters/2); // distance from center to a wheel
-  public static final double kMaxTranslationSpeedMps = Units.feetToMeters(19); // TODO: check
+  public static final double kMaxTranslationSpeedMps = Units.feetToMeters(18); // TODO: check
   public static final double kMaxRotationalSpeedRadPerSecond = kMaxTranslationSpeedMps / kRadius; // omega = v/r
+  public static final double kMaxTranslationAccelerationMps2 = Units.feetToMeters(30); // TODO: check
+  public static final double kMaxRotationalAccelerationRadPerSecond2 = kMaxTranslationAccelerationMps2 / kRadius; // alpha = a/r
 
   // Consturct all the modules
   SwerveModule m_frontLeftModule = new SwerveModule(
@@ -127,7 +132,16 @@ public class Swerve extends SubsystemBase {
    *    for drive consistently CCW+, we will use the raw status signals, which are not
    *    negated. See the translation at https://api.ctr-electronics.com/phoenix6/release/java/src-html/com/ctre/phoenix6/hardware/Pigeon2.html#line.234 */
 
+  // Limelight
   Limelight m_limelight = new Limelight("limelight");
+
+  // Motion Profiled Controller for Turning
+  ProfiledPIDController m_turningController = new ProfiledPIDController(
+    0.0, // TODO: tune
+    0.0,
+    0.0,
+    new Constraints(kMaxRotationalSpeedRadPerSecond, kMaxRotationalAccelerationRadPerSecond2)
+  );
 
   // Singleton code patter ensures only one object exists
   private static Swerve m_instance = null;
@@ -172,6 +186,15 @@ public class Swerve extends SubsystemBase {
     // Request the respective module state from each module
     for (int m = 0; m < m_modules.length; m++)
       m_modules[m].requestState(moduleStates[m]);
+  }
+
+  public double calculateAngularVelocityDemand(Translation2d pointToTurnTo) {
+    Pose2d currentPose = getEstimatedPose();
+    Translation2d currentLocation = currentPose.getTranslation();
+    double currentOrientation = MathUtil.angleModulus(currentPose.getRotation().getRadians());
+    Translation2d difference = currentLocation.minus(pointToTurnTo);
+    double setpoint = MathUtil.angleModulus(difference.getAngle().getRadians());
+    return m_turningController.calculate(currentOrientation, setpoint);
   }
 
   // Lock wheels in an X pattern (make this the default resting state)

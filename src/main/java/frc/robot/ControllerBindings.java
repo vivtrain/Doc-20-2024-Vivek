@@ -5,9 +5,11 @@
 package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.lib.Controllers.RegisteredController;
+import frc.lib.Utility.Utility;
 import frc.robot.Commands.CommandBuilder;
 import frc.robot.Commands.Arm.*;
 import frc.robot.Commands.Shooter.*;
@@ -81,12 +83,23 @@ public class ControllerBindings {
           leftXStickToYVelocity,
           rightXStickToWVelocity));
     
+    DoubleSupplier aimToSpeaker = () -> {
+      if (Utility.isOnBlue()) {
+        Translation2d blueSpeaker = new Translation2d(0.0, 5.52);
+        return Swerve.getInstance().calculateAngularVelocityDemand(blueSpeaker);
+      } else if (Utility.isOnRed()) {
+        Translation2d redSpeaker = new Translation2d(16.6, 5.52);
+        return Swerve.getInstance().calculateAngularVelocityDemand(redSpeaker);
+      } else {
+        return 0.0;
+      }
+    };
     m_baseDriver.registerAxisMap(XboxController.Axis.kLeftTrigger.value, 0.5)
       .whileTrue(
         new Drive(
           leftYStickToXVelocity,
           leftXStickToYVelocity,
-          () -> 0.0)); // TODO: aim
+          aimToSpeaker));
   }
 
   @SuppressWarnings("unused")
