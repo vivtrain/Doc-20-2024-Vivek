@@ -81,18 +81,25 @@ public class Shooter extends SubsystemBase {
 		m_talonConfigurator.apply(gains);
   }
 
+  /** Get the angular speed of the shooter wheels
+   * @return angular speed in RPM */
   public double getRPM() {
     return m_velocityRpsSignal.getValue() * 60;
   }
 
+  /** Get the current setpoint of the shooter
+   * @return setpoint in RPM */
   public double getSetpointRPM() {
     return m_talon.getClosedLoopReference().getValue() * 60;
   }
 
+  /** Set a goal shooter speed
+   * @param rpm goal speed */
   public void revToRPM(double rpm) {
     m_talon.setControl(m_RpsToVoltageRequest.withVelocity(rpm / 60));
   }
 
+  /** Stop the shooter */
   public void stop() {
     m_talon.stopMotor();
   }
