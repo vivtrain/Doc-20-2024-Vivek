@@ -161,7 +161,13 @@ public class Swerve extends SubsystemBase {
     m_gyroConfigurator.apply(gyroMountPoseConfig);
   }
 
-  // Set the position manually
+  /** Reset the robot's position manually. Resets the gyro as well.
+   * @param fieldCoords robot's position in field coordinates, i.e.
+   *   <ul>
+   *     <li> +x is facing away from your alliance station in meters </li>
+   *     <li> +y is facing left in meters </li>
+   *     <li> rotation is CCW+ in radians </li>
+   *   </ul> */
   public void resetPosition(Pose2d fieldCoords) {
     // Reset the gyro, not really necessary but helpful if it matches the pose estimator
     m_gyro.setYaw(fieldCoords.getRotation().getDegrees());
@@ -172,12 +178,14 @@ public class Swerve extends SubsystemBase {
       fieldCoords);
   }
 
-  // Drive the robot relative to its own coordinate system
-  /* Note: The robot-relative ChassisSpeeds coordinates are defined as:
-   *  +vx => forward (from robot's perspective) in meters/sec
-   *  +vy => left (from robot's perspective) in meters/sec
-   *  +vw => counter-clockwise in radians/sec */
-   // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
+  /** Drive the robot relative to its internal coordinate system
+   *  @param chassisSpeeds robot-relative ChassisSpeeds coordinates are defined as:
+   *    <ul>
+   *      <li> +vx => forward (from robot's perspective) in meters/sec </li>
+   *      <li> +vy => left (from robot's perspective) in meters/sec </li>
+   *      <li> +vw => counter-clockwise in radians/sec  </li>
+   *    </ul>
+   *  @apiNote See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html */
   public void requestChassisSpeeds(ChassisSpeeds chassisSpeeds) {
     // Determine necessary module states from the requested robot linear and angular velocities
     SwerveModuleState[] moduleStates = m_kinematics.toSwerveModuleStates(chassisSpeeds);
@@ -188,6 +196,9 @@ public class Swerve extends SubsystemBase {
       m_modules[m].requestState(moduleStates[m]);
   }
 
+  /** Calculates the necessary rotational speed for aiming to a particular location.
+   * @param pointToTurnTo (x,y) point on the field (blue-side origin)
+   * @return angular velocity in radians per second */
   public double calculateAngularVelocityDemand(Translation2d pointToTurnTo) {
     Pose2d currentPose = getEstimatedPose();
     Translation2d currentLocation = currentPose.getTranslation();
@@ -197,33 +208,38 @@ public class Swerve extends SubsystemBase {
     return m_turningController.calculate(currentOrientation, setpoint);
   }
 
-  // Lock wheels in an X pattern (make this the default resting state)
+  /** Lock the swerve wheeels in an X pattern */
   public void lockWheels() {
     for (int m = 0; m < m_modules.length; m++)
       m_modules[m].requestState(kLockedStates[m]);
   }
 
-  // Stop all the drive and azimuth motors (not the default resting state)
+  /** Stop all the drive and azimuth motors wherever they are */
   public void stop() {
     for (SwerveModule module : m_modules)
       module.stop();
   }
 
-  // CCW+ from wherever zeroed
+  /** Get the robot's angular position from wherever the gyro is zeroed
+   * @return Rotation2d representing the gyro reading (CCW+) */
   public Rotation2d getGyroAngularPosition() {
     return Rotation2d.fromDegrees(m_angularPositionDegreesSignal.getValue());
   }
 
-  // CCW+
+  /** Get the robot's angular velocity
+   * @return Rotation2d representing the gyro's velocity reading (CCW+) */
   public Rotation2d getGyroAngularVelocity() {
     return Rotation2d.fromDegrees(m_angularVelocityDpsSignal.getValue());
   }
 
-  /* Note: The robot-relative ChassisSpeeds coordinates are defined as:
-   *  +vx => forward (from robot's perspective) in meters/sec
-   *  +vy => left (from robot's perspective) in meters/sec
-   *  +vw => increasing counter-clockwise in radians/sec */
-   // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
+  /** Get the current robot chassis speeds in its own internal coordinates
+   *  @return robot-relative ChassisSpeeds, defined as:
+   *    <ul>
+   *      <li> +vx => forward (from robot's perspective) in meters/sec </li>
+   *      <li> +vy => left (from robot's perspective) in meters/sec </li>
+   *      <li> +vw => counter-clockwise in radians/sec  </li>
+   *    </ul>
+   *  @apiNote See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html */
   public ChassisSpeeds getChassisSpeedsRobotRelative() {
     SwerveModuleState[] moduleStates = new SwerveModuleState[m_modules.length];
     for (int m = 0; m < m_modules.length; m++)
@@ -232,17 +248,22 @@ public class Swerve extends SubsystemBase {
     return state;
   }
 
-  /* Note: The field-relative ChassisSpeeds coordinates are defined as:
-   *  +vx => forward (from blue alliance driver station) in meters/sec
-   *  +vy => left (from blue alliance driver station) in meters/sec
-   *  +vw => increasing counter-clockwise in radians/sec */
-   // See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html
+  /** Get the current robot speed along field-relative coordinates
+   *  @return field-relative ChassisSpeeds, defined as:
+   *  <ul>
+   *    <li> +vx => forward (from blue alliance driver station) in meters/sec </li>
+   *    <li> +vy => left (from blue alliance driver station) in meters/sec </li>
+   *    <li> +vw => increasing counter-clockwise in radians/sec </li>
+   *  </ul>
+   * @apiNote See WPILib Docs for more info: https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/intro-and-chassis-speeds.html */
   public ChassisSpeeds getChassisSpeedsFieldRelative() {
     return ChassisSpeeds.fromRobotRelativeSpeeds(
       getChassisSpeedsRobotRelative(),
       getGyroAngularPosition());
   }
 
+  /** Get the position of all the modules
+   * @return position of each pair of drive and azimuth motors */
   private SwerveModulePosition[] getModulePositions() {
     SwerveModulePosition[] modulePositions = new SwerveModulePosition[m_modules.length];
     for (int m = 0; m < m_modules.length; m++)
@@ -275,6 +296,9 @@ public class Swerve extends SubsystemBase {
     }
   }
 
+  /** Get the estimated location and orientation of the robot, including vision, gyro, and
+   *  odometry measurements.
+   * @return estimated position */
   public Pose2d getEstimatedPose() {
     return m_poseEstimator.getEstimatedPosition();
   }

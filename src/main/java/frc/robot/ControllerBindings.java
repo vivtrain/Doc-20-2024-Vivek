@@ -83,6 +83,7 @@ public class ControllerBindings {
           leftXStickToYVelocity,
           rightXStickToWVelocity));
     
+    // Design a function that calculates rotational speeds for aiming
     DoubleSupplier aimToSpeaker = () -> {
       if (Utility.isOnBlue()) {
         Translation2d blueSpeaker = new Translation2d(0.0, 5.52);

@@ -6,6 +6,7 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.Commands.CommandBuilder;
 import frc.robot.Subsystems.Arm;
 import frc.robot.Subsystems.Intake;
 import frc.robot.Subsystems.Shooter;
@@ -22,7 +23,7 @@ public class Robot extends TimedRobot {
     Arm.getInstance();
     Intake.getInstance();
     Shooter.getInstance();
-    Swerve.getInstance()/*.setDefaultCommand(new LockSwerveWheels())*/;
+    Swerve.getInstance()/*.setDefaultCommand(CommandBuilder.lockSwerveWheels())*/;
     // Set up Path Planner (do this after subsystem inits, but before creating other commands)
     PathPlannerAutonomous.configure();
     PathPlannerAutonomous.registerNamedCommands();
