@@ -68,16 +68,21 @@ public class Intake extends SubsystemBase {
 		m_talonConfigurator.apply(openLoopVoltageRampRate);
 	}
 
+  /** Checks to see whether the beam break sensor is tripped
+   * @return true if an object is present, false otherwise */
 	public boolean isBeamBroken() {
 		return !m_breakBeam.get();
 	}
 
+  /** Runs the intake
+   * @param dutyCycle [-1,1] fraction of supply voltage, positive => intake, negative => outtake*/
 	public void runWithDutyCycle(double dutyCycle) {
 		m_talon.setControl(m_dutyCycleRequest.withOutput(dutyCycle));
 	}
 
+  /** Stops the intake motor */
   public void stop() {
-	m_talon.stopMotor();
+    m_talon.stopMotor();
   }
 
 	@Override
