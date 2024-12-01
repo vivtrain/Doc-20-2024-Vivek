@@ -5,6 +5,7 @@
 package frc.robot.Subsystems;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Ports;
 
@@ -150,15 +151,20 @@ public class Arm extends SubsystemBase {
 		m_armTalonFollower.setControl(followCtrlRequest);
 
 		// Set Talon position to correspond to CANCoder position
-		m_armTalon.setPosition(m_encoderPositionSignal.refresh().getValue() % 1);
+		m_armTalon.setPosition(
+      MathUtil.inputModulus(m_encoderPositionSignal.refresh().getValue(), -0.5, 0.5));
 	}
 
+  /** Get the arm angle in degrees, upwards positive, zero where the aluminum tube is level
+   * @return arm angle */
 	public double getArmAngleDegrees() {
 		// Encoder will read Arm rotations so translate to degrees
 		double degrees = m_encoderPositionSignal.getValue() * 360;
 		return degrees;
 	}
 
+  /** Set a goal state in degrees for the arm, upwards positive, zero where the aluminum tube is level
+   * @param degrees goal state of the arm */
 	public void moveTo(double degrees) {
 		// Expects Arm degrees but Phoenix will use Arm rotations as feedback
 		int whichSlot = (degrees > getArmAngleDegrees()) ? kAscentGains : kDescentGains;
@@ -171,6 +177,7 @@ public class Arm extends SubsystemBase {
 		);
 	}
 
+  /** Hold the arm's most recent setpoint position */
 	public void hold() {
 		if (m_setpointDegrees == null)
 			return; // skip the rest, since there's no setpoint currently
@@ -182,6 +189,7 @@ public class Arm extends SubsystemBase {
 		);
 	}
 
+  // TODO: debug, remove this functionality
 	public void moveManually(double dutyCycle) {
 		m_setpointDegrees = null;
 		m_armTalon.setControl(m_dutyCycleRequest
@@ -191,6 +199,7 @@ public class Arm extends SubsystemBase {
 		);
 	}
 
+  /** Stop the arm. This should stop both motors if follwer is configured correctly. */
 	public void stop() {
 		m_armTalon.stopMotor();
 	}
