@@ -15,9 +15,9 @@ public class Drive extends Command {
   DoubleSupplier m_vx, m_vy, m_vw;
 
   /** Drive the robot at the requested linear and angular velocity in field coordinates
-   * @param vx meters/second, positive facing away from your alliance wall
-   * @param vy meters/second, positive facing left field boundary
-   * @param vw radians/second, CCW+, with zero aligned with +x */
+   * @param vx function that returns meters/second, positive facing away from your alliance wall
+   * @param vy function that returns meters/second, positive facing left field boundary
+   * @param vw function that returns radians/second, CCW+, with zero aligned with +x */
   public Drive(DoubleSupplier vx, DoubleSupplier vy, DoubleSupplier vw) {
     addRequirements(m_swerve);
     m_vx = vx;

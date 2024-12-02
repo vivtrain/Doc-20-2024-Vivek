@@ -15,6 +15,10 @@ public class MoveArmDutyCycle extends Command {
   int m_axis;
   int m_reverse;
 
+  /** Move the arm with input from a controller axis
+   * @param hid human-interface device (e.g. Joystick)
+   * @param axis ID of axis
+   * @param reverseAxis set to true if input needs to be negated */
   public MoveArmDutyCycle(GenericHID hid, int axis, boolean reverseAxis) {
     addRequirements(m_arm);
     m_hid = hid;

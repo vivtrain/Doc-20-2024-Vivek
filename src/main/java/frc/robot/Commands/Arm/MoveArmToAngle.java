@@ -13,6 +13,9 @@ public class MoveArmToAngle extends Command {
   private Arm m_arm = Arm.getInstance();
   private double m_setpoint, m_tolerance;
 
+  /** Move the arm to a specified angle
+   * @param degrees desired position of the arm, upwards positive, zero when the aluminum tube is level
+   * @param tolerance +/- difference that is considered close enough */
   public MoveArmToAngle(double degrees, double tolerance) {
     addRequirements(m_arm);
     m_setpoint = degrees;

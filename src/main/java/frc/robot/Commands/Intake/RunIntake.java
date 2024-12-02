@@ -13,6 +13,9 @@ public class RunIntake extends Command {
   private double m_dutyCycle;
   private boolean m_useSensor;
 
+  /** Run the intake
+   * @param dutyCycle [-1,1] fraction of supply voltage, positive => intake, negative => outtake
+   * @param useSensor set to true if the Command should finish upon beam-break trip */
   public RunIntake(double dutyCycle, boolean useSensor) {
     addRequirements(m_intake);
     m_dutyCycle = dutyCycle;

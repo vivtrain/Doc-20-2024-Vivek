@@ -14,6 +14,10 @@ public class RevToRPM extends Command {
   private double m_rpm, m_tolerance;
   private boolean m_holdRPM;
 
+  /** Rev the shooter up to a particular RPM
+   * @param rpm angular speed of flywheel
+   * @param tolerance how close is close enough
+   * @param holdRPM set to true if the shooter should continue revving after it reaches the setpoint */
   public RevToRPM(double rpm, double tolerance, boolean holdRPM) {
     addRequirements();
     m_rpm = rpm;
