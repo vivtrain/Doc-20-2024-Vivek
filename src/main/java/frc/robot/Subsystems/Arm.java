@@ -29,9 +29,9 @@ public class Arm extends SubsystemBase {
 	private static final double kReverseLimitMotorRotations = 1.00; // TODO: determine empirically
 	private static final int kAscentGains = 0;
 	private static final int kDescentGains = 1;
-	private static final double kCruiseVelocityRps = 0.25 / 0.628; // TODO: check for accuracy
-	private static final double kMaxAccelerationRps2 = 0.0;
-	private static final double kMaxJerkRps3 = 0.0;
+	private static final double kMaxVelocityRps = 5800 / 60 / kGearReduction * 1.0; // TODO: check for accuracy
+	private static final double kMaxAccelerationRps2 = kMaxVelocityRps * 3;
+	private static final double kMaxJerkRps3 = kMaxAccelerationRps2 * 10;
 
 	// Talons
 	private TalonFX m_armTalon = new TalonFX(Ports.CANDevices.Talons.ARM_LEADER, "*");
@@ -112,19 +112,18 @@ public class Arm extends SubsystemBase {
 			.withFeedbackSensorSource(FeedbackSensorSourceValue.RemoteCANcoder)
 			.withFeedbackRemoteSensorID(m_encoder.getDeviceID())
 			.withRotorToSensorRatio(kGearReduction)
-			.withSensorToMechanismRatio(1 / 1);
+			.withSensorToMechanismRatio(1 / 1)
+      .withFeedbackRotorOffset(0.0);
 		m_armConfiguratorLeader.apply(feedbackConfig);
-
 		// Set up gain profiles
-		// https://www.reca.lc/arm?armMass=%7B%22s%22%3A15%2C%22u%22%3A%22lbs%22%7D&comLength=%7B%22s%22%3A16%2C%22u%22%3A%22in%22%7D&currentLimit=%7B%22s%22%3A40%2C%22u%22%3A%22A%22%7D&efficiency=90&endAngle=%7B%22s%22%3A90%2C%22u%22%3A%22deg%22%7D&iterationLimit=10000&motor=%7B%22quantity%22%3A2%2C%22name%22%3A%22Kraken%20X60%20%28FOC%29%2A%22%7D&ratio=%7B%22magnitude%22%3A240%2C%22ratioType%22%3A%22Reduction%22%7D&startAngle=%7B%22s%22%3A0%2C%22u%22%3A%22deg%22%7D
 		Slot0Configs ascentConfig = new Slot0Configs() // TODO: figure out proper values
 			.withGravityType(GravityTypeValue.Arm_Cosine) // 0 should be horizontal (i.e. max holding torque)
-			.withKG(0.07) // These were pulled directly from Reca.lc
+			.withKG(0.04 * 12.0)
 			.withKS(0.0)
-			.withKV(29.79)
+			.withKV(12.0 / kMaxVelocityRps)
 			//.withKV(0.0)
 			//.withKA(0.02)
-			.withKP(10.0)
+			.withKP(12.0 / (30.0/360.0))
 			.withKI(0.0)
 			.withKD(0.0);
 		Slot1Configs descentConfig = new Slot1Configs() // TODO: figure out proper values
@@ -141,7 +140,7 @@ public class Arm extends SubsystemBase {
 
 		// Set up Motion Magic (R)
 		MotionMagicConfigs motionMagicConfig = new MotionMagicConfigs() // TODO: figure out proper values
-			.withMotionMagicCruiseVelocity(kCruiseVelocityRps)
+			.withMotionMagicCruiseVelocity(kMaxVelocityRps)
 			.withMotionMagicAcceleration(kMaxAccelerationRps2)
 			.withMotionMagicJerk(kMaxJerkRps3);
 		m_armConfiguratorLeader.apply(motionMagicConfig);
@@ -149,10 +148,6 @@ public class Arm extends SubsystemBase {
 		// Make the follower follow the leader, but in the opposite direction
 		Follower followCtrlRequest = new Follower(m_armTalon.getDeviceID(), true);
 		m_armTalonFollower.setControl(followCtrlRequest);
-
-		// Set Talon position to correspond to CANCoder position
-		m_armTalon.setPosition(
-      MathUtil.inputModulus(m_encoderPositionSignal.refresh().getValue(), -0.5, 0.5));
 	}
 
   /** Get the arm angle in degrees, upwards positive, zero where the aluminum tube is level
@@ -167,13 +162,11 @@ public class Arm extends SubsystemBase {
    * @param degrees goal state of the arm */
 	public void moveTo(double degrees) {
 		// Expects Arm degrees but Phoenix will use Arm rotations as feedback
-		int whichSlot = (degrees > getArmAngleDegrees()) ? kAscentGains : kDescentGains;
+		int whichSlot = kAscentGains;//(degrees > getArmAngleDegrees()) ? kAscentGains : kDescentGains;
 		m_setpointDegrees = degrees;
 		m_armTalon.setControl(m_positionControlReqeust
 			.withSlot(whichSlot)
 			.withPosition(degrees / 360)
-			.withLimitForwardMotion(getArmAngleDegrees() > 80) // just in case
-			.withLimitReverseMotion(getArmAngleDegrees() < 5) // just in case
 		);
 	}
 
@@ -184,8 +177,6 @@ public class Arm extends SubsystemBase {
 		m_armTalon.setControl(m_positionControlReqeust
 			.withSlot(kAscentGains)
 			.withPosition(m_setpointDegrees / 360)
-			.withLimitForwardMotion(getArmAngleDegrees() > 80) // just in case
-			.withLimitReverseMotion(getArmAngleDegrees() < 5)  // just in case
 		);
 	}
 
@@ -194,8 +185,6 @@ public class Arm extends SubsystemBase {
 		m_setpointDegrees = null;
 		m_armTalon.setControl(m_dutyCycleRequest
 			.withOutput(dutyCycle)
-			.withLimitForwardMotion(getArmAngleDegrees() > 80) // just in case
-			.withLimitReverseMotion(getArmAngleDegrees() < 5)  // just in case
 		);
 	}
 
@@ -213,15 +202,16 @@ public class Arm extends SubsystemBase {
 		// Place all readouts in below function
 		outputTelemetry();
 
-		if (getArmAngleDegrees() > 80 || getArmAngleDegrees() < 10) {
+		if (getArmAngleDegrees() > 80 || getArmAngleDegrees() < -1) {
 			stop();
 		}
 	}
 
 	private void outputTelemetry() {
-		SmartDashboard.putNumber("Arm/encoder degrees", getArmAngleDegrees());
-		SmartDashboard.putNumber("Arm/talon arm rotations", m_armTalonPositionSignal.getValue());
+		SmartDashboard.putNumber("Arm/encoder position (deg)", getArmAngleDegrees());
+		SmartDashboard.putNumber("Arm/talon position (arm rot)", m_armTalonPositionSignal.getValue());
 		SmartDashboard.putNumber("Arm/duty cycle", m_armTalon.getDutyCycle().refresh().getValue());
+    SmartDashboard.putNumber("Arm/PID setpoint", m_armTalon.getClosedLoopReference().refresh().getValue());
     SmartDashboard.putNumber("Arm/PID error", m_armTalon.getClosedLoopError().refresh().getValue());
     SmartDashboard.putNumber("Arm/PID output", m_armTalon.getClosedLoopOutput().refresh().getValue());
 	}
