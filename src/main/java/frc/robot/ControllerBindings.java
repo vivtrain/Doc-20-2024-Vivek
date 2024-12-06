@@ -37,7 +37,7 @@ public class ControllerBindings {
 
   // Set up all our bindings
   public void bindCommandsToControllers() {
-    bindBaseController();
+    // bindBaseController();
     bindCoDriverController();
   }
 

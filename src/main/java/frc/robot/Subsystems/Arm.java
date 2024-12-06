@@ -28,7 +28,6 @@ public class Arm extends SubsystemBase {
 	private static final double kForwardLimitMotorRotations = 1.20; // TODO: determine empirically
 	private static final double kReverseLimitMotorRotations = 1.00; // TODO: determine empirically
 	private static final int kAscentGains = 0;
-	private static final int kDescentGains = 1;
 	private static final double kMaxVelocityRps = 5800 / 60 / kGearReduction * 1.0; // TODO: check for accuracy
 	private static final double kMaxAccelerationRps2 = kMaxVelocityRps * 3;
 	private static final double kMaxJerkRps3 = kMaxAccelerationRps2 * 10;
@@ -126,17 +125,7 @@ public class Arm extends SubsystemBase {
 			.withKP(12.0 / (30.0/360.0))
 			.withKI(0.0)
 			.withKD(0.0);
-		Slot1Configs descentConfig = new Slot1Configs() // TODO: figure out proper values
-			.withGravityType(GravityTypeValue.Arm_Cosine) // 0 should be horizontal (i.e. max holding torque)
-			.withKG(0.07) // These were pulled directly from Reca.lc
-			.withKS(0.0)
-			.withKV(29.79)
-			//.withKA(0.02)
-			.withKP(10.0)
-			.withKI(0.0)
-			.withKD(0.0);
 		m_armConfiguratorLeader.apply(ascentConfig);
-		m_armConfiguratorLeader.apply(descentConfig);
 
 		// Set up Motion Magic (R)
 		MotionMagicConfigs motionMagicConfig = new MotionMagicConfigs() // TODO: figure out proper values
