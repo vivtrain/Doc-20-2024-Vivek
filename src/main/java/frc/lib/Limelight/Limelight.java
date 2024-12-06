@@ -7,7 +7,6 @@ package frc.lib.Limelight;
 import java.util.Optional;
 
 import frc.lib.Limelight.LimelightHelpers.*;
-import frc.lib.Utility.Utility;
 
 public class Limelight {
 
@@ -33,7 +32,7 @@ public class Limelight {
     for (RawFiducial result : results)
       if (result.id == tagID)
         return Optional.of(result);
-    return null;
+    return Optional.empty();
   }
 
   /** Get the the target area as a fraction (in the range [0-1]) of the total image area
@@ -43,7 +42,7 @@ public class Limelight {
     if (seesValidTargets(1))
       return Optional.of(LimelightHelpers.getTA(m_name));
     else
-      return null;
+      return Optional.empty();
   }
 
   /** Get the angle (right positive, center zero) to a specific tag if it is seen
@@ -51,8 +50,8 @@ public class Limelight {
    * @return either the angle in degrees or null */
   public Optional<Double> getAngleToTagDegrees(int tagID) {
     Optional<RawFiducial> tag = getAprilTagInfo(tagID);
-    if (tag == null)
-      return null;
+    if (!tag.isPresent())
+      return Optional.empty();
     return Optional.of(tag.get().txnc);
   }
 
@@ -81,6 +80,6 @@ public class Limelight {
   public Optional<PoseEstimate> getBotPoseEstimate() {
     if (seesValidTargets(1))
       return Optional.of(LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(m_name));
-    return null;
+    return Optional.empty();
   }
 }
