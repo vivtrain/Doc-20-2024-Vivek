@@ -7,6 +7,7 @@ package frc.robot.Commands;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import frc.lib.Utility.Utility;
@@ -35,7 +36,7 @@ public class CommandBuilder {
   }
 
   public static Command intake() {
-    return new RunIntake(0.5, true);
+    return new RunIntake(0.75, true);
   }
 
   public static Command outtake() {
@@ -52,7 +53,9 @@ public class CommandBuilder {
 
   public static Command fire() {
     return new SequentialCommandGroup(
-      new RevToRPM(4000, 100, true),
+      new ParallelCommandGroup(
+        raiseArm(),
+        new RevToRPM(3000, 100, true)),
       new WaitCommand(1.0)
         .deadlineWith(new RunIntake(0.75, false)),
       stopShooter()

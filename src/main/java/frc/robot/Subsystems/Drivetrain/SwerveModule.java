@@ -12,6 +12,7 @@ import com.ctre.phoenix6.signals.*;
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -22,16 +23,17 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 public class SwerveModule extends SubsystemBase {
 
   // Constants
-  private static final double kDriveMaxStatorAmps = 5.0; // TODO: raise when safe
+  private static final double kDriveMaxStatorAmps = 80.0; // TODO: raise when safe
   private static final double kDriveMaxSupplyAmps = 0.0; // TODO: raise when safe
-  private static final double kAzimuthMaxStatorAmps = 5.0; // TODO: raise when safe
+  private static final double kAzimuthMaxStatorAmps = 40.0; // TODO: raise when safe
   private static final double kAzimuthMaxSupplyAmps = 0.0; // TODO: raise when safe
   private static final double kSecondsToRampVoltage = 0.01;
-  private static final double kDriveGearReduction = 5.51 / 1;
-  private static final double kAzimuthGearReduction = 13.37 / 1;
-  private static final double kWheelCircumferenceMeters = Math.PI*Units.inchesToMeters(3.87);
-  private static final double kMaxAccelerationRps2 = 0.0; // TODO; set reasonable value
-  private static final double kMaxJerkRps3 = 0.0; // TODO; set reasonable value
+  private static final double kDriveGearReduction = 5.14 / 1;
+  private static final double kAzimuthGearReduction = 396.0 / 35.0 / 1;
+  private static final double kWheelCircumferenceMeters = Math.PI * Units.inchesToMeters(3.87) * 0.93;
+  private static final double kMaxVelocityRps = Swerve.kMaxTranslationSpeedMps / kWheelCircumferenceMeters;
+  private static final double kMaxAccelerationRps2 = kMaxVelocityRps / 1;
+  private static final double kMaxJerkRps3 = kMaxAccelerationRps2 / 0.01;
 
   // Diffrentiate which module is which
   public static enum ModuleCorners { kFrontLeft, kFrontRight, kRearLeft, kRearRight }
@@ -73,7 +75,7 @@ public class SwerveModule extends SubsystemBase {
       InvertedValue driveDirection,
       InvertedValue azimuthDirection,
       SensorDirectionValue encoderDirection,
-      double encoderOffsetRotations) {
+      Rotation2d encoderOffset) {
     // Initialize
     m_driveTalon = new TalonFX(driveID, "*");
     m_azimuthTalon = new TalonFX(azimuthID, "*");
@@ -126,7 +128,8 @@ public class SwerveModule extends SubsystemBase {
 
 		// Apply offset to and determine direction of encoder
 		MagnetSensorConfigs magnetConfig = new MagnetSensorConfigs()
-			.withMagnetOffset(encoderOffsetRotations)
+			.withMagnetOffset(encoderOffset.getRotations())
+      .withAbsoluteSensorRange(AbsoluteSensorRangeValue.Signed_PlusMinusHalf)
 			.withSensorDirection(encoderDirection); // when looking at the status LED
 		m_encoderConfigurator.apply(magnetConfig);
 
@@ -146,27 +149,25 @@ public class SwerveModule extends SubsystemBase {
     m_driveConfigurator.apply(driveFeedbackConfig);
 
     // Set up gains
-    // Drive gains are motion profiled
     Slot0Configs driveGains = new Slot0Configs()
 			.withKS(0.0)
-			.withKV(0.0)
+			.withKV(12.0 / kMaxVelocityRps)
 			.withKA(0.0)
-			.withKP(0.0)
+			.withKP(2.0)
 			.withKI(0.0)
 			.withKD(0.0);
     m_driveConfigurator.apply(driveGains);
-    // Azimuth gains are just straight PID (this could be upgraded)
     Slot0Configs azimuthGains = new Slot0Configs()
 			.withKS(0.0)
-			.withKP(0.0)
+			.withKP(12.0 / 0.25) // Units are volts per rotation
 			.withKI(0.0)
 			.withKD(0.0);
     m_azimuthConfigurator.apply(azimuthGains);
 
     // Set up Motion Magic (R)
-		MotionMagicConfigs driveMotionMagicConfig = new MotionMagicConfigs() // TODO: figure out proper values
-			.withMotionMagicAcceleration(kMaxAccelerationRps2)
-			.withMotionMagicJerk(kMaxJerkRps3);
+    MotionMagicConfigs driveMotionMagicConfig = new MotionMagicConfigs()
+      .withMotionMagicAcceleration(kMaxAccelerationRps2)
+      .withMotionMagicJerk(kMaxJerkRps3);
     m_driveConfigurator.apply(driveMotionMagicConfig);
   }
 
@@ -174,7 +175,7 @@ public class SwerveModule extends SubsystemBase {
    * @return SwerveModulePosition containing drive position in meters and azimuth
    * position as a Rotation2d */
   public SwerveModulePosition getPosition() {
-    return new SwerveModulePosition(getDrivePositionMeters(), getAzimuthPosition());
+    return new SwerveModulePosition(getDrivePositionMeters(), getAzimuthPositionEncoder());
   }
 
   /** Get the state of the module
@@ -184,7 +185,7 @@ public class SwerveModule extends SubsystemBase {
   public SwerveModuleState getState() {
     return new SwerveModuleState(
       getDriveVelocityMps(),
-      getAzimuthPosition());
+      getAzimuthPositionEncoder());
   }
 
   /** Set a goal state for the module
@@ -193,9 +194,12 @@ public class SwerveModule extends SubsystemBase {
    * @apiNote See WPILib Docs for more info https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/swerve-drive-kinematics.html */
   public void requestState(SwerveModuleState state) {
     // Optimize the requested state (i.e. take the shortest path to the correct azimuth)
-    state = SwerveModuleState.optimize(state, getAzimuthPosition());
+    state = SwerveModuleState.optimize(state, getAzimuthPositionEncoder());
+    // Make the angle wrap around correctly by using a setpoint based off current position
+    double diff = MathUtil.angleModulus(state.angle.getRadians() - getAzimuthPositionEncoder().getRadians());
+    state.angle = Rotation2d.fromRadians(getAzimuthPositionEncoder().getRadians() + diff);
     // Perform cosine optimization (i.e. scale the speed based on azimuthal error)
-    state.speedMetersPerSecond *= state.angle.minus(getAzimuthPosition()).getCos();
+    state.speedMetersPerSecond *= state.angle.minus(getAzimuthPositionEncoder()).getCos();
     requestDriveVelocity(state.speedMetersPerSecond);
     requestAzimuthPosition(state.angle);
   }
@@ -219,7 +223,8 @@ public class SwerveModule extends SubsystemBase {
     return m_driveVelocityRpsSignal.getValue() * kWheelCircumferenceMeters;
   }
 
-  private Rotation2d getAzimuthPosition() {
+  // Keep this as a continuous value (i.e. do not wrap around from 359 -> 0)
+  private Rotation2d getAzimuthPositionEncoder() {
     return Rotation2d.fromRotations(m_azimuthPositionRotationsSignal.getValue());
   }
 
@@ -229,7 +234,7 @@ public class SwerveModule extends SubsystemBase {
 
   private void requestDriveVelocity(double metersPerSecond) {
     double rps = metersPerSecond / kWheelCircumferenceMeters;
-    m_driveTalon.setControl(m_driveVelocityRpsRequest.withVelocity(rps));
+    m_driveTalon.setControl(m_driveVelocityRpsRequest.withVelocity(rps).withSlot(0));
   }
 
   private void requestAzimuthPosition(Rotation2d position) {
@@ -240,13 +245,19 @@ public class SwerveModule extends SubsystemBase {
 
   private void outputTelemetry() {
     SmartDashboard.putNumber(
-      "Swerve/" + m_whichModule.toString() + "/Drive Mps",
+      "Swerve/" + m_whichModule.toString() + "/Drive Velocity (mps)",
       getDriveVelocityMps());
     SmartDashboard.putNumber(
-      "Swerve/" + m_whichModule.toString() + "/Drive Meters",
+      "Swerve/" + m_whichModule.toString() + "/Drive Velocity Setpoint (mps)",
+      m_driveTalon.getClosedLoopReference().refresh().getValue() * kWheelCircumferenceMeters);
+    SmartDashboard.putNumber(
+      "Swerve/" + m_whichModule.toString() + "/Drive Velocity Error (mps)",
+      m_driveTalon.getClosedLoopError().refresh().getValue() * kWheelCircumferenceMeters);
+    SmartDashboard.putNumber(
+      "Swerve/" + m_whichModule.toString() + "/Drive Position (m)",
       getDrivePositionMeters());
     SmartDashboard.putNumber(
-      "Swerve/" + m_whichModule.toString() + "/Azimuth Degrees",
-      getAzimuthPosition().getDegrees());
+      "Swerve/" + m_whichModule.toString() + "/Azimuth Position (deg)",
+      getAzimuthPositionEncoder().getDegrees());
   }
 }

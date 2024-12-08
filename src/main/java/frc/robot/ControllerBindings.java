@@ -50,29 +50,34 @@ public class ControllerBindings {
     final int leftY = XboxController.Axis.kLeftY.value;
     final int rightX = XboxController.Axis.kRightX.value;
     final double stickThreshold = 0.1;
+    final double translationDownscale = 0.5;
+    final double rotationDownscale = 0.1;
     Trigger baseLeftStick = m_baseDriver.register2DAxisMap(leftX, leftY, stickThreshold);
     Trigger baseRightStick = m_baseDriver.registerAxisMap(rightX, stickThreshold);
     // Design mappings from sticks to real world velocities
     /* Note the change in controller axes to field coordinate axes */
     DoubleSupplier leftYStickToXVelocity = () -> {
       // read the controller + rescale the remaining range
-      double vx = MathUtil.applyDeadband(m_baseDriver.getRawAxis(leftY), stickThreshold);
+      double vx = MathUtil.applyDeadband(-m_baseDriver.getRawAxis(leftY), stickThreshold);
       vx *= Math.abs(vx); // square to produce finer control near zero and preserve direction
       vx *= Swerve.kMaxTranslationSpeedMps; // scale to real world speed
+      vx *= translationDownscale;
       return vx;
     };
     DoubleSupplier leftXStickToYVelocity = () -> {
       // read the controller + rescale the remaining range
-      double vy = MathUtil.applyDeadband(m_baseDriver.getRawAxis(leftX), stickThreshold);
+      double vy = MathUtil.applyDeadband(-m_baseDriver.getRawAxis(leftX), stickThreshold);
       vy *= Math.abs(vy); // square to produce finer control near zero and preserve direction
       vy *= Swerve.kMaxTranslationSpeedMps; // scale to real world speed
+      vy *= translationDownscale;
       return vy;
     };
     DoubleSupplier rightXStickToWVelocity = () -> {
       // read the controller + rescale the remaining range
-      double vw = MathUtil.applyDeadband(m_baseDriver.getRawAxis(rightX), stickThreshold);
+      double vw = MathUtil.applyDeadband(-m_baseDriver.getRawAxis(rightX), stickThreshold);
       vw *= Math.abs(vw); // square to produce finer control near zero and preserve direction
       vw *= Swerve.kMaxRotationalSpeedRadPerSecond; // scale to real world angular speed
+      vw *= rotationDownscale;
       return vw;
     };
     // Use our triggers to drive with requested velocities whenever we control with the sticks
@@ -84,6 +89,7 @@ public class ControllerBindings {
           rightXStickToWVelocity));
     
     // Design a function that calculates rotational speeds for aiming
+    /*
     DoubleSupplier aimToSpeaker = () -> {
       if (Utility.isOnBlue()) {
         Translation2d blueSpeaker = new Translation2d(0.0, 5.52);
@@ -100,7 +106,7 @@ public class ControllerBindings {
         new Drive(
           leftYStickToXVelocity,
           leftXStickToYVelocity,
-          aimToSpeaker));
+          aimToSpeaker)); */
   }
 
   @SuppressWarnings("unused")
@@ -119,7 +125,7 @@ public class ControllerBindings {
     m_coDriver.registerButtonMap(XboxController.Button.kLeftBumper.value)
       .whileTrue(CommandBuilder.outtake());
     m_coDriver.registerAxisMap(XboxController.Axis.kRightTrigger.value, 0.5)
-      .whileTrue(new RevToRPM(3000, 100, true));
+      .onTrue(CommandBuilder.fire());
     m_coDriver.registerButtonMap(XboxController.Button.kB.value)
       .onTrue(CommandBuilder.stopShooter());
   }

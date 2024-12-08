@@ -29,8 +29,8 @@ public class Arm extends SubsystemBase {
   private static final double kReverseLimitMotorRotations = 1.00; // TODO: determine empirically
   private static final int kAscentGains = 0;
   private static final double kMaxVelocityRps = 5800 / 60 / kGearReduction * 1.0; // TODO: check for accuracy
-  private static final double kMaxAccelerationRps2 = kMaxVelocityRps * 3;
-  private static final double kMaxJerkRps3 = kMaxAccelerationRps2 * 10;
+  private static final double kMaxAccelerationRps2 = kMaxVelocityRps / 0.25;
+  private static final double kMaxJerkRps3 = kMaxAccelerationRps2 / 0.01;
 
   // Talons
   private TalonFX m_armTalon = new TalonFX(Ports.CANDevices.Talons.ARM_LEADER, "*");
@@ -122,7 +122,7 @@ public class Arm extends SubsystemBase {
       .withKV(12.0 / kMaxVelocityRps)
       //.withKV(0.0)
       //.withKA(0.02)
-      .withKP(12.0 / (30.0/360.0))
+      .withKP(12.0 / (45.0/360.0))
       .withKI(0.0)
       .withKD(0.0);
     m_armConfiguratorLeader.apply(ascentConfig);
@@ -190,10 +190,6 @@ public class Arm extends SubsystemBase {
     //hold();
     // Place all readouts in below function
     outputTelemetry();
-
-    if (getArmAngleDegrees() > 80 || getArmAngleDegrees() < -1) {
-      stop();
-    }
   }
 
   private void outputTelemetry() {

@@ -11,6 +11,7 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.MountPoseConfigs;
 import com.ctre.phoenix6.configs.Pigeon2Configurator;
 import com.ctre.phoenix6.hardware.Pigeon2;
+import com.ctre.phoenix6.mechanisms.swerve.SwerveDrivetrain.SwerveDriveState;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 
@@ -40,20 +41,24 @@ public class Swerve extends SubsystemBase {
 
   // Constants
   private static final SwerveModuleState[] kLockedStates = {
-    new SwerveModuleState(0, Rotation2d.fromDegrees(45)),
     new SwerveModuleState(0, Rotation2d.fromDegrees(-45)),
+    new SwerveModuleState(0, Rotation2d.fromDegrees(45)),
     new SwerveModuleState(0, Rotation2d.fromDegrees(45)),
     new SwerveModuleState(0, Rotation2d.fromDegrees(-45)),
   };
   public static final double kTrackWidthMeters = Units.inchesToMeters(23.25); // distance from left wheel to right wheel
   public static final double kWheelBaseMeters = Units.inchesToMeters(23.25); // distance from front wheel to back wheel
   public static final double kRadius = Math.hypot(kWheelBaseMeters/2, kTrackWidthMeters/2); // distance from center to a wheel
-  public static final double kMaxTranslationSpeedMps = Units.feetToMeters(18); // TODO: check
+  public static final double kMaxTranslationSpeedMps = Units.feetToMeters(20.36);
   public static final double kMaxRotationalSpeedRadPerSecond = kMaxTranslationSpeedMps / kRadius; // omega = v/r
   public static final double kMaxTranslationAccelerationMps2 = Units.feetToMeters(30); // TODO: check
   public static final double kMaxRotationalAccelerationRadPerSecond2 = kMaxTranslationAccelerationMps2 / kRadius; // alpha = a/r
 
   // Consturct all the modules
+  /* Modules zeroed along robot coordinate system:
+   * - Forward drive direction facing +x (i.e. forward)
+   * - Bevels facing +y (i.e. left)
+   * - Azimuth direction being CCW+ as viewed from the above the robot */
   SwerveModule m_frontLeftModule = new SwerveModule(
     SwerveModule.ModuleCorners.kFrontLeft,
     Ports.CANDevices.Talons.SWERVE_FRONT_LEFT_DRIVE,
@@ -61,8 +66,8 @@ public class Swerve extends SubsystemBase {
     Ports.CANDevices.Encoders.SWERVE_FRONT_LEFT,
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
-    SensorDirectionValue.Clockwise_Positive, // TODO: determine empirically
-    0 // TODO: determine empirically
+    SensorDirectionValue.CounterClockwise_Positive,
+    Rotation2d.fromDegrees(161.2)
   );
   SwerveModule m_frontRightModule = new SwerveModule(
     SwerveModule.ModuleCorners.kFrontRight,
@@ -71,8 +76,8 @@ public class Swerve extends SubsystemBase {
     Ports.CANDevices.Encoders.SWERVE_FRONT_RIGHT,
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
-    SensorDirectionValue.Clockwise_Positive, // TODO: determine empirically
-    0 // TODO: determine empirically
+    SensorDirectionValue.CounterClockwise_Positive,
+    Rotation2d.fromDegrees(-169.2)
   );
   SwerveModule m_rearLeftModule = new SwerveModule(
     SwerveModule.ModuleCorners.kRearLeft,
@@ -81,8 +86,8 @@ public class Swerve extends SubsystemBase {
     Ports.CANDevices.Encoders.SWERVE_REAR_LEFT,
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
-    SensorDirectionValue.Clockwise_Positive, // TODO: determine empirically
-    0 // TODO: determine empirically
+    SensorDirectionValue.CounterClockwise_Positive,
+    Rotation2d.fromDegrees(-38.1)
   );
   SwerveModule m_rearRightModule = new SwerveModule(
     SwerveModule.ModuleCorners.kRearRight,
@@ -91,8 +96,8 @@ public class Swerve extends SubsystemBase {
     Ports.CANDevices.Encoders.SWERVE_REAR_RIGHT,
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
     InvertedValue.Clockwise_Positive, // TODO: determine empirically
-    SensorDirectionValue.Clockwise_Positive, // TODO: determine empirically
-    0 // TODO: determine empirically
+    SensorDirectionValue.CounterClockwise_Positive,
+    Rotation2d.fromDegrees(113.3)
   );
 
   // Collect into an array
@@ -159,6 +164,9 @@ public class Swerve extends SubsystemBase {
       .withMountPoseRoll(0.0)
       .withMountPoseYaw(0.0);
     m_gyroConfigurator.apply(gyroMountPoseConfig);
+
+    // Zero the gyro on init
+    m_gyro.reset();
   }
 
   /** Reset the robot's position manually. Resets the gyro as well.
@@ -210,8 +218,10 @@ public class Swerve extends SubsystemBase {
 
   /** Lock the swerve wheeels in an X pattern */
   public void lockWheels() {
-    for (int m = 0; m < m_modules.length; m++)
+    for (int m = 0; m < m_modules.length; m++) {
+      m_modules[m].stop();
       m_modules[m].requestState(kLockedStates[m]);
+    }
   }
 
   /** Stop all the drive and azimuth motors wherever they are */
@@ -322,6 +332,10 @@ public class Swerve extends SubsystemBase {
       chassisSpeeds.vxMetersPerSecond);
     SmartDashboard.putNumber("Swerve/Odometry/Y Velocity (mps)",
       chassisSpeeds.vyMetersPerSecond);
+    double translationVelocity
+      = Math.hypot(chassisSpeeds.vxMetersPerSecond, chassisSpeeds.vyMetersPerSecond);
+    SmartDashboard.putNumber("Swerve/Odometry/Translation Velocity (mps)",
+      translationVelocity);
     SmartDashboard.putNumber("Swerve/Odometry/Angular Velocity (rad per s)",
       chassisSpeeds.omegaRadiansPerSecond);
     // Pose Estimator (field coords)

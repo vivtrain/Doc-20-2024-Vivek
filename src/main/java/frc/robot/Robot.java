@@ -14,16 +14,16 @@ import frc.robot.Subsystems.Drivetrain.Swerve;
 
 public class Robot extends TimedRobot {
 
+  // Initailze subsystems by constructing them here
+  Arm m_arm = Arm.getInstance();
+  Intake m_intake = Intake.getInstance();
+  Shooter m_shooter = Shooter.getInstance();
+  Swerve m_swerve = Swerve.getInstance();
+
   @Override
   public void robotInit() {
-    // Initailze subsystems by constructing them here
-    /* Note: even though this is not strictly necessary, it's best to pre-compute and config
-     * as much as possible */
     // This is a good place to establish any default commands using Subsystem.setDefaultCommand
-    Arm.getInstance();
-    Intake.getInstance();
-    Shooter.getInstance();
-    Swerve.getInstance()/*.setDefaultCommand(CommandBuilder.lockSwerveWheels())*/;
+    m_swerve.setDefaultCommand(CommandBuilder.lockSwerveWheels());
     // Set up Path Planner (do this after subsystem inits, but before creating other commands)
     PathPlannerAutonomous.configure();
     PathPlannerAutonomous.registerNamedCommands();
@@ -37,7 +37,12 @@ public class Robot extends TimedRobot {
   }
 
   @Override
-  public void disabledInit() {}
+  public void disabledInit() {
+    m_arm.stop();
+    m_intake.stop();
+    m_shooter.stop();
+    m_swerve.stop();
+  }
 
   @Override
   public void disabledPeriodic() {}
