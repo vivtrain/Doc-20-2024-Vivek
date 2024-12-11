@@ -169,6 +169,9 @@ public class SwerveModule extends SubsystemBase {
       .withMotionMagicAcceleration(kMaxAccelerationRps2)
       .withMotionMagicJerk(kMaxJerkRps3);
     m_driveConfigurator.apply(driveMotionMagicConfig);
+
+    // Reset the drive posiiton of the module
+    m_driveTalon.setPosition(0.0);
   }
 
   /** Get the position of the module

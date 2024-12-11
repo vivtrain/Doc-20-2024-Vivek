@@ -5,8 +5,12 @@
 package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.lib.Controllers.RegisteredController;
 import frc.lib.Utility.Utility;
@@ -37,7 +41,7 @@ public class ControllerBindings {
 
   // Set up all our bindings
   public void bindCommandsToControllers() {
-    // bindBaseController();
+    bindBaseController();
     bindCoDriverController();
   }
 
@@ -49,11 +53,14 @@ public class ControllerBindings {
     final int leftX = XboxController.Axis.kLeftX.value;
     final int leftY = XboxController.Axis.kLeftY.value;
     final int rightX = XboxController.Axis.kRightX.value;
+    final int leftTrigger = XboxController.Axis.kLeftTrigger.value;
     final double stickThreshold = 0.1;
+    final double triggerThreshold = 0.5;
     final double translationDownscale = 0.5;
     final double rotationDownscale = 0.1;
     Trigger baseLeftStick = m_baseDriver.register2DAxisMap(leftX, leftY, stickThreshold);
     Trigger baseRightStick = m_baseDriver.registerAxisMap(rightX, stickThreshold);
+    Trigger baseLeftTrigger = m_baseDriver.registerAxisMap(leftTrigger, triggerThreshold);
     // Design mappings from sticks to real world velocities
     /* Note the change in controller axes to field coordinate axes */
     DoubleSupplier leftYStickToXVelocity = () -> {
@@ -80,20 +87,13 @@ public class ControllerBindings {
       vw *= rotationDownscale;
       return vw;
     };
-    // Use our triggers to drive with requested velocities whenever we control with the sticks
-    baseLeftStick.or(baseRightStick)
-      .whileTrue(
-        new Drive(
-          leftYStickToXVelocity,
-          leftXStickToYVelocity,
-          rightXStickToWVelocity));
-    
     // Design a function that calculates rotational speeds for aiming
-    /*
     DoubleSupplier aimToSpeaker = () -> {
       if (Utility.isOnBlue()) {
         Translation2d blueSpeaker = new Translation2d(0.0, 5.52);
-        return Swerve.getInstance().calculateAngularVelocityDemand(blueSpeaker);
+        double demand = Swerve.getInstance().calculateAngularVelocityDemand(blueSpeaker);
+        SmartDashboard.putNumber("debug/calc turn demand", demand);
+        return demand;
       } else if (Utility.isOnRed()) {
         Translation2d redSpeaker = new Translation2d(16.6, 5.52);
         return Swerve.getInstance().calculateAngularVelocityDemand(redSpeaker);
@@ -101,12 +101,24 @@ public class ControllerBindings {
         return 0.0;
       }
     };
-    m_baseDriver.registerAxisMap(XboxController.Axis.kLeftTrigger.value, 0.5)
+    // While the trigger is not held and either stick is moved, then drive manually
+    baseLeftTrigger.negate().and(baseLeftStick.or(baseRightStick))
       .whileTrue(
         new Drive(
           leftYStickToXVelocity,
           leftXStickToYVelocity,
-          aimToSpeaker)); */
+          rightXStickToWVelocity));
+    // Whie the trigger is held, drive with the locked position
+    baseLeftTrigger
+      .whileTrue(
+        new Drive(
+          leftYStickToXVelocity,
+          leftXStickToYVelocity,
+          aimToSpeaker));
+    
+    // Zero the pose estimator (debug TODO: remove)
+    m_baseDriver.registerButtonMap(XboxController.Button.kA.value)
+      .onTrue(new InstantCommand(() -> Swerve.getInstance().resetPosition(new Pose2d(0.0, 0.0, Rotation2d.fromDegrees(0.0)))));
   }
 
   @SuppressWarnings("unused")

@@ -142,7 +142,7 @@ public class Swerve extends SubsystemBase {
 
   // Motion Profiled Controller for Turning
   ProfiledPIDController m_turningController = new ProfiledPIDController(
-    0.0, // TODO: tune
+    5.0,
     0.0,
     0.0,
     new Constraints(kMaxRotationalSpeedRadPerSecond, kMaxRotationalAccelerationRadPerSecond2)
@@ -165,8 +165,8 @@ public class Swerve extends SubsystemBase {
       .withMountPoseYaw(0.0);
     m_gyroConfigurator.apply(gyroMountPoseConfig);
 
-    // Zero the gyro on init
-    m_gyro.reset();
+    // Zero position on init
+    resetPosition(new Pose2d(0.0, 0.0, Rotation2d.fromDegrees(0.0)));
   }
 
   /** Reset the robot's position manually. Resets the gyro as well.
@@ -218,10 +218,8 @@ public class Swerve extends SubsystemBase {
 
   /** Lock the swerve wheeels in an X pattern */
   public void lockWheels() {
-    for (int m = 0; m < m_modules.length; m++) {
-      m_modules[m].stop();
+    for (int m = 0; m < m_modules.length; m++)
       m_modules[m].requestState(kLockedStates[m]);
-    }
   }
 
   /** Stop all the drive and azimuth motors wherever they are */
