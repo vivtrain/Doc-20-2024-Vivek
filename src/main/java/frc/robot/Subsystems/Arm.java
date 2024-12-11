@@ -25,8 +25,8 @@ public class Arm extends SubsystemBase {
   private static final double kMaxStatorAmps = 40.0; // TODO: raise once safety established
   private static final double kMaxSupplyAmps = 0.0; // TODO: raise once safety established
   private static final double kSecondsToRampVoltage = 0.1;
-  private static final double kForwardLimitMotorRotations = 1.20; // TODO: determine empirically
-  private static final double kReverseLimitMotorRotations = 1.00; // TODO: determine empirically
+  private static final double kForwardLimitRotations = 90.0 / 360.0; // TODO: determine empirically
+  private static final double kReverseLimitRotations = -2.0 / 360.0; // TODO: determine empirically
   private static final int kAscentGains = 0;
   private static final double kMaxVelocityRps = 5800 / 60 / kGearReduction * 1.0; // TODO: check for accuracy
   private static final double kMaxAccelerationRps2 = kMaxVelocityRps / 0.25;
@@ -78,10 +78,10 @@ public class Arm extends SubsystemBase {
 
     // Setup actuation limits
     SoftwareLimitSwitchConfigs actuationLimits = new SoftwareLimitSwitchConfigs()
-      .withForwardSoftLimitThreshold(kForwardLimitMotorRotations)
-      .withForwardSoftLimitEnable(false)
-      .withReverseSoftLimitThreshold(kReverseLimitMotorRotations)
-      .withReverseSoftLimitEnable(false);
+      .withForwardSoftLimitThreshold(kForwardLimitRotations)
+      .withForwardSoftLimitEnable(true)
+      .withReverseSoftLimitThreshold(kReverseLimitRotations)
+      .withReverseSoftLimitEnable(true);
     m_armConfiguratorLeader.apply(actuationLimits);
 
     // Configure global motor output parameters
@@ -137,6 +137,10 @@ public class Arm extends SubsystemBase {
     // Make the follower follow the leader, but in the opposite direction
     Follower followCtrlRequest = new Follower(m_armTalon.getDeviceID(), true);
     m_armTalonFollower.setControl(followCtrlRequest);
+
+    // Ensure the Talon position equals the CANCoder position on startup
+    m_armTalon.setPosition(
+      MathUtil.inputModulus(m_encoderPositionSignal.refresh().getValue(), -0.5, 0.5));
   }
 
   /** Get the arm angle in degrees, upwards positive, zero where the aluminum tube is level
@@ -186,8 +190,6 @@ public class Arm extends SubsystemBase {
   public void periodic() {
     // Refresh all status signals once per robot loop
     BaseStatusSignal.refreshAll(m_armTalonPositionSignal, m_encoderPositionSignal);
-    // Hold your position (if there exists a setpoint)
-    //hold();
     // Place all readouts in below function
     outputTelemetry();
   }
